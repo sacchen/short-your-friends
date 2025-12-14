@@ -176,6 +176,13 @@ class OrderBook:
                 heapq.heappush(self._asks_heap, price)
             self._asks[price].append(order)
 
+    def add_order(self, side: str, price: int, quantity: int, order_id: int) -> None:
+        """
+        Public method to add a resting order to the book without matching.
+        For matching orders, use process_order() instead.
+        """
+        self._add_to_book(side, price, quantity, order_id)
+
     def cancel_order(self, order_id: int) -> None:
         """
         Cancels an order
