@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 
 from .linked_list import OrderList
 from .node import OrderNode
+from .trade import Trade
 
 
 @dataclass
@@ -21,7 +22,128 @@ class OrderBook:
     _bids_heap: List[int] = field(default_factory=list)
     _asks_heap: List[int] = field(default_factory=list)
 
-    def add_order(self, side: str, price: int, quantity: int, order_id: int) -> None:
+    def process_order(
+        self, side: str, price: int, quantity: int, order_id: int
+    ) -> List[Trade]:
+        """
+        Matches the order against the book.
+        Remainder of partial matches is added to the book.
+        """
+        trades = []
+        remaining_qty = quantity
+
+        if side == "buy":
+            # While there is qty to buy and there are sellers
+            while remaining_qty > 0 and self._asks_heap:
+                best_ask_price = self._asks_heap[0]
+
+                # Does Buy Price >= Best Sell Price?
+                if price < best_ask_price:
+                    break
+
+                # Get the queue of order at this best price
+                # lazy deletion here?
+                if best_ask_price not in self._asks:
+                    heapq.heappop(self._asks_heap)
+                    continue
+
+                best_ask_queue = self._asks[best_ask_price]
+
+                # Go thru queue (Time Priority)
+                # Head is oldest order
+                while remaining_qty > 0 and best_ask_queue.head:
+                    maker_order = best_ask_queue.head
+
+                    # Calculate trade size
+                    trade_qty = min(remaining_qty, maker_order.quantity)
+
+                    # Execute Trade
+                    trades.append(
+                        Trade(
+                            buy_order_id=order_id,
+                            sell_order_id=maker_order.order_id,
+                            price=best_ask_price,  # Trade at Maker's price
+                            quantity=trade_qty,
+                            maker_order_id=maker_order.order_id,
+                            taker_order_id=order_id,
+                        )
+                    )
+
+                    # Update quantities
+                    remaining_qty -= trade_qty
+                    maker_order.quantity -= trade_qty
+                    best_ask_queue.total_volume -= trade_qty
+
+                    # If maker order is filled, remove it
+                    if maker_order.quantity == 0:
+                        best_ask_queue.remove(maker_order)
+                        del self._orders[maker_order.order_id]
+
+                # If the queue is empty, remove it
+                if best_ask_queue.count == 0:
+                    del self._asks[best_ask_price]
+                    heapq.heappop(self._asks_heap)
+
+        elif side == "sell":
+            # Sell logic checks Bids
+
+            # Check against Bids
+            while remaining_qty > 0 and self._bids_heap:
+                # Bids are stored as negative numbers
+                # Flip it back
+                best_bid_price = -self._bids_heap[0]
+
+                # Check Spread
+                # No deal if Sell Price > Best Bid
+                if price > best_bid_price:
+                    break
+
+                # Lazy deletion check
+                # Earlier we marked the node for deletion and now we're doing it.
+                if best_bid_price not in self._bids:
+                    heapq.heappop(self._bids_heap)
+                    continue
+
+                best_bid_queue = self._bids[best_bid_price]
+
+                # Go thru Queue (Time Priority)
+                while remaining_qty > 0 and best_bid_queue.head:
+                    maker_order = best_bid_queue.head  # This is "buy" order
+
+                    trade_qty = min(remaining_qty, maker_order.quantity)
+
+                    # Trade Receipt
+                    # Arguments are flipped
+                    trades.append(
+                        Trade(
+                            buy_order_id=maker_order.order_id,  # Maker is the Buyer here
+                            sell_order_id=order_id,  # We (Taker) are the Seller
+                            price=best_bid_price,  # Trade at Maker's price
+                            quantity=trade_qty,
+                            maker_order_id=maker_order.order_id,
+                            taker_order_id=order_id,
+                        )
+                    )
+
+                    remaining_qty -= trade_qty
+                    maker_order.quantity -= trade_qty
+                    best_bid_queue.total_volume -= trade_qty
+
+                    if maker_order.quantity == 0:
+                        best_bid_queue.remove(maker_order)
+                        del self._orders[maker_order.order_id]
+
+                if best_bid_queue.count == 0:
+                    del self._bids[best_bid_price]
+                    heapq.heappop(self._bids_heap)
+
+        # If there is anything left, put it on the book
+        if remaining_qty > 0:
+            self._add_to_book(side, price, remaining_qty, order_id)
+
+        return trades
+
+    def _add_to_book(self, side: str, price: int, quantity: int, order_id: int) -> None:
         """
         Places a resting order in the book
         Doesn't match orders
