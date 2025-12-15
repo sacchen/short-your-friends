@@ -116,7 +116,7 @@ class OrderBook:
                     # Arguments are flipped
                     trades.append(
                         Trade(
-                            buy_order_id=maker_order.order_id,  # Maker is the Buyer here
+                            buy_order_id=maker_order.order_id,  # Maker is the Buyer
                             sell_order_id=order_id,  # We (Taker) are the Seller
                             price=best_bid_price,  # Trade at Maker's price
                             quantity=trade_qty,
