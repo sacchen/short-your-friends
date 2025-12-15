@@ -1,5 +1,10 @@
 import asyncio
 
+from src.orderbook.book import OrderBook
+
+# Global instance (Shared Memory)
+market = OrderBook()
+
 
 async def handle_client(reader, writer):
     """
@@ -13,18 +18,25 @@ async def handle_client(reader, writer):
 
     try:
         while True:
-            # Wait for data
-            # Looking for \n. Using Newline Delimited JSON
+            # Wait for data (ending in \n)
             data = await reader.readuntil(b"\n")
 
+            # Parse JSON
+            # Expect strings like: {"type": "limit", "side": "buy", "price": 100, "qty": 10}
+
+            # BASIC LOGIC:
+            # Wait for data
+            # Looking for \n. Using Newline Delimited JSON
+            # data = await reader.readuntil(b"\n")
+
             # Decode bytes -> string
-            message = data.decode().strip()
-            print(f"Received: {message}")
+            # message = data.decode().strip()
+            # print(f"Received: {message}")
 
             # Echo: Send it back
-            response = f"Echo: {message}\n"
-            writer.write(response.encode())
-            await writer.drain()  # Makes sure buffer flushes to network
+            # response = f"Echo: {message}\n"
+            # writer.write(response.encode())
+            # await writer.drain()  # Makes sure buffer flushes to network
 
     except asyncio.IncompleteReadError:
         print(f"[-] Client {addr} disconnected.")
