@@ -30,6 +30,9 @@ class OrderBook:
     # Track net positions per user
     _positions: Dict[int, int] = field(default_factory=dict)  # user_id -> net_qty
 
+    # Track if market is open
+    active: bool = True
+
     def process_order(
         self,
         side: str,
@@ -42,6 +45,12 @@ class OrderBook:
         Matches the order against the book.
         Remainder of partial matches is added to the book.
         """
+        # Gatekeeper
+        if not self.active:
+            print("DEBUG: Order rejected because market is CLOSED")
+            # raise exception or return error
+            raise ValueError("Market is closed.")
+
         trades = []
         remaining_qty = quantity
 
@@ -183,6 +192,10 @@ class OrderBook:
         Places a resting order in the book
         Doesn't match orders
         """
+        # Gatekeeper
+        if not self.active:
+            raise ValueError("Market is closed.")
+
         # Create order node
         order = OrderNode(
             order_id=order_id,
@@ -316,6 +329,9 @@ class OrderBook:
         Settle entire market at terminal_price (0 or 1).
         Cancels all orders and settles all positions.
         """
+        self.active = False
+        print(f"DEBUG: Market is now CLOSED (Active={self.active})")
+
         trades: list[Trade] = []
 
         # Cancel all resting orders

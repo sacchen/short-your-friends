@@ -68,29 +68,35 @@ async def handle_client(
                         market_id_dict["threshold_minutes"],
                     )
 
-                    # Process order (matches immediately if possible)
-                    trades = engine.process_order(
-                        market_id=market_id,
-                        side=limit_req["side"],
-                        price=limit_req["price"],
-                        quantity=limit_req["qty"],
-                        order_id=limit_req["id"],
-                        user_id=limit_req["user_id"],
-                    )
+                    try:
+                        # Process order (matches immediately if possible)
+                        trades = engine.process_order(
+                            market_id=market_id,
+                            side=limit_req["side"],
+                            price=limit_req["price"],
+                            quantity=limit_req["qty"],
+                            order_id=limit_req["id"],
+                            user_id=limit_req["user_id"],
+                        )
 
-                    resp = {
-                        "status": "accepted",
-                        "message": f"Order placed, {len(trades)} trades executed",
-                    }
+                        resp = {
+                            "status": "accepted",
+                            "message": f"Order placed, {len(trades)} trades executed",
+                        }
 
-                    # market.add_order(
-                    #     side=request["side"],
-                    #     price=request["price"],
-                    #     quantity=request["qty"],
-                    #     order_id=request["id"],
-                    #     user_id=user_id,
-                    # )
-                    # resp = {"status": "accepted"}
+                        # market.add_order(
+                        #     side=request["side"],
+                        #     price=request["price"],
+                        #     quantity=request["qty"],
+                        #     order_id=request["id"],
+                        #     user_id=user_id,
+                        # )
+                        # resp = {"status": "accepted"}
+
+                    except ValueError as e:
+                        # Error Response (Market is Closed)
+                        print(f"[{addr}] Rejected: {e}")
+                        resp = {"status": "error", "message": str(e)}
 
                 elif request["type"] == "cancel":
                     # TODO: Need to know which market this order is in
