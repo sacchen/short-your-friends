@@ -21,7 +21,18 @@ warn_unused_ignores = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
 check_untyped_defs = true
+
+# Use mypy_path so imports resolve correctly
+mypy_path = "src"
+
+# src-layout: treat `src/` as the only package root
+explicit_package_bases = true
+namespace_packages = true
+
+# Check everything starting from src/ and the two scripts
 files = ["src", "server.py", "benchmark.py"]
+
+# Usage: uv run mypy
 
 [tool.ruff]
 line-length = 88

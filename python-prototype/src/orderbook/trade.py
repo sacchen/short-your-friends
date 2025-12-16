@@ -9,3 +9,5 @@ class Trade:
     quantity: int
     maker_order_id: int  # Existing order
     taker_order_id: int  # New order that triggers trade
+    buy_user_id: int
+    sell_user_id: int

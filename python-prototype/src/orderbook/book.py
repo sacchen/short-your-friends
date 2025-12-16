@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 from .linked_list import OrderList
 from .node import OrderNode
 from .trade import Trade
+from .types import PriceLevel
 
 
 @dataclass
@@ -22,8 +23,16 @@ class OrderBook:
     _bids_heap: List[int] = field(default_factory=list)
     _asks_heap: List[int] = field(default_factory=list)
 
+    # Track net positions per user
+    _positions: Dict[int, int] = field(default_factory=dict)  # user_id -> net_qty
+
     def process_order(
-        self, side: str, price: int, quantity: int, order_id: int
+        self,
+        side: str,
+        price: int,
+        quantity: int,
+        order_id: int,
+        user_id: int,
     ) -> List[Trade]:
         """
         Matches the order against the book.
@@ -66,7 +75,17 @@ class OrderBook:
                             quantity=trade_qty,
                             maker_order_id=maker_order.order_id,
                             taker_order_id=order_id,
+                            buy_user_id=user_id,  # taker is buyer
+                            sell_user_id=maker_order.user_id,  # maker is seller
                         )
+                    )
+
+                    # Update positions
+                    self._positions[user_id] = (
+                        self._positions.get(user_id, 0) + trade_qty
+                    )
+                    self._positions[maker_order.user_id] = (
+                        self._positions.get(maker_order.user_id, 0) - trade_qty
                     )
 
                     # Update quantities
@@ -122,7 +141,17 @@ class OrderBook:
                             quantity=trade_qty,
                             maker_order_id=maker_order.order_id,
                             taker_order_id=order_id,
+                            buy_user_id=maker_order.user_id,  # maker is buyer
+                            sell_user_id=user_id,  # taker is seller
                         )
+                    )
+
+                    # Update positions
+                    self._positions[maker_order.user_id] = (
+                        self._positions.get(maker_order.user_id, 0) + trade_qty
+                    )
+                    self._positions[user_id] = (
+                        self._positions.get(user_id, 0) - trade_qty
                     )
 
                     remaining_qty -= trade_qty
@@ -139,18 +168,24 @@ class OrderBook:
 
         # If there is anything left, put it on the book
         if remaining_qty > 0:
-            self._add_to_book(side, price, remaining_qty, order_id)
+            self._add_to_book(side, price, remaining_qty, order_id, user_id)
 
         return trades
 
-    def _add_to_book(self, side: str, price: int, quantity: int, order_id: int) -> None:
+    def _add_to_book(
+        self, side: str, price: int, quantity: int, order_id: int, user_id: int
+    ) -> None:
         """
         Places a resting order in the book
         Doesn't match orders
         """
         # Create order node
         order = OrderNode(
-            order_id=order_id, price=price, quantity=quantity, timestamp=time.time()
+            order_id=order_id,
+            user_id=user_id,
+            price=price,
+            quantity=quantity,
+            timestamp=time.time(),
         )
 
         # Store in global map
@@ -176,12 +211,14 @@ class OrderBook:
                 heapq.heappush(self._asks_heap, price)
             self._asks[price].append(order)
 
-    def add_order(self, side: str, price: int, quantity: int, order_id: int) -> None:
+    def add_order(
+        self, side: str, price: int, quantity: int, order_id: int, user_id: int
+    ) -> None:
         """
         Public method to add a resting order to the book without matching.
         For matching orders, use process_order() instead.
         """
-        self._add_to_book(side, price, quantity, order_id)
+        self._add_to_book(side, price, quantity, order_id, user_id)
 
     def cancel_order(self, order_id: int) -> None:
         """
@@ -240,3 +277,80 @@ class OrderBook:
             else:
                 heapq.heappop(self._asks_heap)
         return None
+
+    def snapshot(self) -> dict[str, list[PriceLevel]]:
+        """
+        Returns a snapshot of the current order book as lists of price levels.
+        Bids are sorted descending by price, asks ascending.
+        """
+        bids: list[PriceLevel] = []
+        for price, order_list in sorted(self._bids.items(), reverse=True):
+            bids.append(
+                {
+                    "price": price,
+                    "volume": order_list.total_volume,
+                    "count": order_list.count,
+                }
+            )
+
+        asks: list[PriceLevel] = []
+        for price, order_list in sorted(self._asks.items()):
+            asks.append(
+                {
+                    "price": price,
+                    "volume": order_list.total_volume,
+                    "count": order_list.count,
+                }
+            )
+
+        return {"bids": bids, "asks": asks}
+
+    SYSTEM_USER_ID = 0  # Reserved system account
+
+    def settle_market(self, terminal_price: int) -> list[Trade]:
+        """
+        Settle entire market at terminal_price (0 or 1).
+        Cancels all orders and settles all positions.
+        """
+        trades: list[Trade] = []
+
+        # Cancel all resting orders
+        orders_to_cancel = list(self._orders.keys())
+        for old in orders_to_cancel:
+            self.cancel_order(old)
+
+        # Settle positions
+        for user_id, net_qty in self._positions.items():
+            if net_qty == 0:
+                continue
+
+            # Create synthetic trade
+            if net_qty > 0:  # Long position
+                qty = net_qty
+                if terminal_price == 1:
+                    buy_user, sell_user = user_id, self.SYSTEM_USER_ID
+                else:
+                    buy_user, sell_user = self.SYSTEM_USER_ID, user_id
+            else:  # Short position
+                qty = -net_qty
+                if terminal_price == 1:
+                    buy_user, sell_user = self.SYSTEM_USER_ID, user_id
+                else:
+                    buy_user, sell_user = user_id, self.SYSTEM_USER_ID
+
+            trades.append(
+                Trade(
+                    buy_order_id=-1,
+                    sell_order_id=-1,
+                    price=terminal_price,
+                    quantity=qty,
+                    maker_order_id=-1,
+                    taker_order_id=-1,
+                    buy_user_id=buy_user,
+                    sell_user_id=sell_user,
+                )
+            )
+
+            self._positions[user_id] = 0
+
+        return trades
