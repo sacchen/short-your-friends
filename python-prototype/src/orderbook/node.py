@@ -6,6 +6,7 @@ from typing import Optional
 class OrderNode:
     # Data
     order_id: int
+    user_id: int
     price: int
     quantity: int
     timestamp: float
