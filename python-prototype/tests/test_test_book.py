@@ -51,3 +51,35 @@ def test_lazy_deletion_asks():
     book.cancel_order(1)
 
     assert book.get_best_ask() == 101
+
+
+def test_time_priority_fifo():
+    """
+    Scenario:
+    1. Alice sells 10 @ $100 (Order ID 1)
+    2. Bob sells 10 @ $100 (Order ID 2) -- Same price, but later time
+    3. Charlie buys 10 @ $100.
+
+    Result:
+    - Alice gets filled. Bob gets nothing.
+    """
+    book = OrderBook()
+
+    # 1. Alice (Early Bird)
+    book.process_order("sell", 100, 10, 1)
+
+    # 2. Bob (Late Arrival)
+    book.process_order("sell", 100, 10, 2)
+
+    # 3. Charlie (Taker)
+    trades = book.process_order("buy", 100, 10, 3)
+
+    assert len(trades) == 1
+    trade = trades[0]
+
+    # CRITICAL: The maker_order_id MUST be 1 (Alice), not 2 (Bob)
+    assert trade.maker_order_id == 1
+
+    # Check book: Bob should still be there
+    # (Assuming your book exposes a way to peek at the queue)
+    # assert book.asks[100].head.order_id == 2

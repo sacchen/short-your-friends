@@ -11,13 +11,17 @@ from .types import PriceLevel
 
 @dataclass
 class OrderBook:
+    # Find order
     # Order ID -> OrderNode
     _orders: Dict[int, OrderNode] = field(default_factory=dict)
 
+    # Price Levels
     # Price -> OrderList
+    # Key=Price, Value=Linked List of orders at that price
     _bids: Dict[int, OrderList] = field(default_factory=dict)
     _asks: Dict[int, OrderList] = field(default_factory=dict)
 
+    # Sorted prices
     # Heaps with lazy deletion
     # _bids_heap stores -price since heapq is a Min-Heap
     _bids_heap: List[int] = field(default_factory=list)
