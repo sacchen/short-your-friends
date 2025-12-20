@@ -10,50 +10,57 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 import random
+import statistics
 import time
 
 from orderbook.book import OrderBook
 
 
-def run_benchmark(n_orders: int = 100_000) -> None:
-    book = OrderBook()
+def run_benchmark(n_orders: int = 100_000, n_iterations: int = 10) -> None:
+    """
+    Run multiple benchmark iterations and report average throughput.
+    """
+    print(f"Running {n_iterations} iterations of {n_orders:,} orders each...")
+    print("=" * 60)
 
-    # Two users trade
-    book.process_order("buy", price=100, quantity=10, order_id=1, user_id=100)
-    book.process_order("sell", price=100, quantity=10, order_id=2, user_id=200)
+    throughputs = []
 
-    print(book._positions)  # Should show {100: 10, 200: -10}
+    for iteration in range(n_iterations):
+        book = OrderBook()
 
-    # Pre-generate data so we measure the ENGINE, not the random number generator
-    print(f"Generating {n_orders} random orders...")
-    orders: list[tuple[str, int, int, int]] = []
-    for i in range(n_orders):
-        side = "buy" if random.random() < 0.5 else "sell"
-        price = random.randint(90, 110)  # Tight spread to force matches
-        qty = random.randint(1, 10)
-        orders.append((side, price, qty, i))
+        # Pre-generate data so we measure the ENGINE, not the random number generator
+        orders: list[tuple[str, int, int, int]] = []
+        for i in range(n_orders):
+            side = "buy" if random.random() < 0.5 else "sell"
+            price = random.randint(90, 110)  # Tight spread to force matches
+            qty = random.randint(1, 10)
+            orders.append((side, price, qty, i))
 
-    print("Starting benchmark...")
-    start_time = time.time()
+        start_time = time.perf_counter()
 
-    matches = 0
-    for i, (side, price, qty, oid) in enumerate(orders):
-        user_id = i  # stand-in user_id
-        trades = book.process_order(side, price, qty, oid, user_id)
-        matches += len(trades)
+        matches = 0
+        for i, (side, price, qty, oid) in enumerate(orders):
+            user_id = i
+            trades = book.process_order(side, price, qty, oid, user_id)
+            matches += len(trades)
 
-    end_time = time.time()
-    duration = end_time - start_time
-    ops = n_orders / duration
+        end_time = time.perf_counter()
+        duration = end_time - start_time
+        ops = n_orders / duration
+        throughputs.append(ops)
 
-    print("\n--- Results ---")
-    print(f"Processed {n_orders:,} orders in {duration:.4f} seconds")
-    print(f"Throughput: {ops:,.0f} orders/second")
-    print(f"Total Trades Executed: {matches:,}")
+        print(
+            f"Iteration {iteration + 1:2d}: {ops:,.0f} orders/sec ({duration:.4f}s, {matches:,} trades)"
+        )
 
-    # Validation check (book shouldn't be empty, but shouldn't have 100k orders)
-    print(f"Remaining Bids in Heap: {len(book._bids_heap)}")
-    print(f"Remaining Asks in Heap: {len(book._asks_heap)}")
+    # Calculate average
+    avg_throughput = statistics.mean(throughputs)
+
+    print("\n" + "=" * 60)
+    print("--- Results ---")
+    print(f"Average Throughput: {avg_throughput:,.0f} orders/second")
+    print(f"Min: {min(throughputs):,.0f} orders/second")
+    print(f"Max: {max(throughputs):,.0f} orders/second")
 
 
 if __name__ == "__main__":
