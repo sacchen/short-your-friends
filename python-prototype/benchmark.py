@@ -1,6 +1,9 @@
 """
 Usage: uv run python benchmark.py
 at short-your-friends/python-prototype
+
+Using Pypy optimizations on python 3.11
+uv run --python pypy --no-dev benchmark.py
 """
 
 import sys
@@ -41,8 +44,9 @@ def run_benchmark(n_orders: int = 100_000, n_iterations: int = 10) -> None:
         matches = 0
         for i, (side, price, qty, oid) in enumerate(orders):
             user_id = i
-            trades = book.process_order(side, price, qty, oid, user_id)
-            matches += len(trades)
+            # trades = book.process_order(side, price, qty, oid, user_id)
+            # matches += len(trades)
+            book.process_order(side, price, qty, oid, user_id)
 
         end_time = time.perf_counter()
         duration = end_time - start_time

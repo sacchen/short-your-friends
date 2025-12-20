@@ -3,7 +3,7 @@ name = "order-book"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.11"
 dependencies = []
 
 [dependency-groups]
@@ -13,8 +13,14 @@ dev = [
     "ruff>=0.14.8",
 ]
 
+# Group for benchmark-only tools (keeps them out of dev/prod)
+benchmark = [
+    # "pytest-benchmark",  # Uncomment if pytest becomes dependency
+]
+
 [tool.mypy]
 strict = true
+python_version = "3.14"
 warn_return_any = true
 warn_unused_configs = true
 warn_unused_ignores = true
