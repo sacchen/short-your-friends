@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Any, Dict, Tuple
 
 from .book import OrderBook
@@ -85,3 +86,63 @@ class MatchingEngine:
         return results
 
     # TODO: add get_market_details() that returns graph data/history
+
+    def dump_state(self) -> dict:
+        """
+        Serializes the exchange state to JSON.
+        Structure:
+        {
+            "market_key_str": {
+                "bids": [ {order_dict}, ... ],
+                "asks": [ {order_dict}, ... ]
+            }
+        }
+        """
+        state = {}
+        for market_id, book in self._markets.items():
+            # Composite key needs to be a string for JSON
+            # key is tuple before converting to string
+            # key format: "user_id:minutes"
+            key = f"{market_id[0]}:{market_id[1]}"
+
+            # Helper to convert a list of Orders to dicts
+            def serialize_orders(orders):
+                return [
+                    {
+                        "id": o.order_id,
+                        "user_id": o.user_id,
+                        "price": str(o.price),
+                        "qty": o.quantity,
+                        "side": o.side,  # "buy" or "sell"
+                    }
+                    for o in orders
+                ]
+
+            state[key] = {
+                "bids": serialize_orders(book.bids),
+                "asks": serialize_orders(book.asks),
+            }
+        return state
+
+    def load_state(self, data: dict) -> None:
+        """Restores exchange state."""
+        self._markets.clear()
+
+        for key, book_data in data.items():
+            # Parse key "user_id:minutes" back to tuple
+            target_user, minutes_str = key.split(":")
+            market_id = (target_user, int(minutes_str))
+
+            # Recreate orders
+            for side in ["bids", "asks"]:
+                for o_data in book_data.get(side, []):
+                    # Process as new orders to rebuild the book structures
+                    # (safer than inserting into lists)
+                    self.process_order(
+                        market_id=market_id,
+                        side=o_data["side"],
+                        price=Decimal(o_data["price"]),
+                        quantity=int(o_data["qty"]),
+                        order_id=o_data["id"],
+                        user_id=o_data["user_id"],
+                    )
