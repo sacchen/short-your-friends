@@ -308,6 +308,9 @@ async def handle_client(
                 await writer.drain()
 
             except KeyError as e:
+                import traceback
+
+                traceback.print_exc()
                 # Catches if client sends {"type": "limit"} but not "price"
                 err = {"status": "error", "message": f"Missing field: {e}"}
                 writer.write((json.dumps(err) + "\n").encode())
@@ -355,12 +358,37 @@ async def main() -> None:
 DB_FILE = "state.json"
 
 
+class GameStateEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return str(obj)
+        return super().default(obj)
+
+
 def save_world():
     print("[*] Saving world state...")
-    data = {"economy": economy.dump_state(), "engine": engine.dump_state()}
-    with open(DB_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-    print("[*] Save complete.")
+
+    # Get raw state
+    data = {
+        "economy": economy.dump_state(),
+        "engine": engine.dump_state(),
+        "mapper": user_id_mapper.dump_state(),
+    }
+
+    # Use custom encoder for Decimals (money)
+    # Prevents "Object of type Decimal is not JSON serializable" crash
+    class DecimalEncoder(json.JSONEncoder):
+        def default(self, obj):
+            if isinstance(obj, Decimal):
+                return str(obj)
+            return super().default(obj)
+
+    try:
+        with open(DB_FILE, "w") as f:
+            json.dump(data, f, indent=2, cls=DecimalEncoder)
+        print("[*] Save complete.")
+    except Exception as e:
+        print(f"[!] SAVE FAILED: {e}")
 
 
 def load_world():
@@ -375,6 +403,8 @@ def load_world():
 
         if "economy" in data:
             economy.load_state(data["economy"])
+        if "mapper" in data:
+            user_id_mapper.load_state(data["mapper"])
         if "engine" in data:
             engine.load_state(data["engine"])
 
@@ -383,11 +413,52 @@ def load_world():
         )
     except Exception as e:
         print(f"[!] Failed to load save file: {e}")
+        import traceback
+
+        traceback.print_exc()
 
 
 if __name__ == "__main__":
     try:
         load_world()  # Load on start
+
+        # Dev data: Seed market
+        # Runs if database is empty
+        if not engine._markets:
+            print("[+] Seeding Dev Data...")
+
+            # Define Market ID
+            m_id = ("alice", 480)
+
+            # Create Market
+            engine.create_market(m_id, "Alice Sleep 8:00 AM")
+
+            # Create generic Market Maker user
+            mm_id = user_id_mapper.to_internal("market_maker")
+
+            # Place Seed Orders (Prices in Cents)
+            # Buy 10 contracts at $0.40
+            engine.process_order(
+                market_id=m_id,
+                side="buy",
+                price=40,
+                quantity=10,
+                order_id="seed_buy_1",
+                user_id=mm_id,
+            )
+
+            # Sell 10 contracts at $0.60
+            engine.process_order(
+                market_id=m_id,
+                side="sell",
+                price=60,
+                quantity=10,
+                order_id="seed_sell_1",
+                user_id=mm_id,
+            )
+
+            print("[+] Seeding Complete: Added 'Alice Sleep 8:00 AM'")
+
         # Run event loop
         asyncio.run(main())
     except KeyboardInterrupt:
