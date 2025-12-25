@@ -15,6 +15,8 @@ state.json
 .venv
 
 # Swift / Xcode
+.DS_Store
+**/.DS_Store
 build/
 DerivedData/
 *.xcodeproj/project.xcworkspace/xcuserdata/
