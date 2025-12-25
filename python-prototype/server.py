@@ -1,4 +1,8 @@
 # Usage: PYTHONPATH=src uv run server.py
+# To test JSON saving,
+# run server, run test_integration.py, stop server,
+# check state.json, start server
+# uv run pytest tests/test_integration.py
 
 import asyncio
 import json
@@ -347,9 +351,6 @@ async def main() -> None:
 
 
 # Stop and load JSON when we start.
-# To test,
-# run server, run test_integration.py, stop server,
-# check state.json, start server
 
 DB_FILE = "state.json"
 
