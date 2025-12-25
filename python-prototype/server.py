@@ -2,7 +2,10 @@
 
 import asyncio
 import json
+from decimal import Decimal
 from typing import Any, Union
+
+from orderbook.economy import EconomyManager
 
 # from orderbook.book import OrderBook
 from orderbook.engine import MarketId, MatchingEngine
@@ -22,6 +25,7 @@ ResponseTypes = Union[
 # Global instance (Shared Memory)
 # market = OrderBook()
 engine = MatchingEngine()
+economy = EconomyManager()
 
 
 async def handle_client(
@@ -55,11 +59,56 @@ async def handle_client(
                 # resp: dict[str, Any] | SnapshotResponse
                 resp: ResponseTypes
 
+                # Economy & Health Endpoints for Swift Client
+                if request["type"] == "proof_of_walk":
+                    # {"type:": "proof_of_walk", "user_id": "alice", "steps": 5000}
+                    user_id = request["user_id"]
+                    steps = int(request["steps"])
+
+                    minted = economy.process_proof_of_walk(user_id, steps)
+                    new_balance = economy.get_account(user_id).balance_available
+
+                    resp = {
+                        "status": "ok",
+                        "minted": str(minted),
+                        "new_balance": str(new_balance),
+                    }
+
+                elif request["type"] == "balance":
+                    # {"type": "balance", "user_id": "alice"}
+                    user_id = request["user_id"]
+                    account = economy.get_account(user_id)
+                    resp = {
+                        "status": "ok",
+                        "user_id": user_id,
+                        "available": str(account.balance_available),
+                        "locked": str(account.balance_locked),
+                        "total_equity": str(account.total_equity()),
+                    }
+                # Trading Logic with Economy Checks
                 # Switchboard (Routing logic to Engine)
-                if request["type"] == "limit":
+                elif request["type"] == "limit":
                     # Need auth/session in future
                     # user_id = int(request.get("user_id", 0))
                     limit_req: LimitOrderRequest = request
+
+                    # Extract Data
+                    user_id = limit_req["user_id"]
+                    price = Decimal(str(limit_req["price"]))
+                    qty = int(limit_req["qty"])
+                    side = limit_req["side"]
+
+                    # Check Funds for Buys
+                    if side == "buy":
+                        if not economy.attempt_order_lock(user_id, price, qty):
+                            resp = {
+                                "status": "error",
+                                "message": f"Insufficient funds. Need {price * qty}",
+                            }
+                            # Send error and skip the rest
+                            writer.write((json.dumps(resp) + "\n").encode())
+                            await writer.drain()
+                            continue
 
                     # Extract market_id from request
                     market_id_dict = limit_req["market_id"]
@@ -71,13 +120,28 @@ async def handle_client(
                     try:
                         # Process order (matches immediately if possible)
                         trades = engine.process_order(
+                            # market_id=market_id,
+                            # side=limit_req["side"],
+                            # price=limit_req["price"],
+                            # quantity=limit_req["qty"],
+                            # order_id=limit_req["id"],
+                            # user_id=limit_req["user_id"],
                             market_id=market_id,
-                            side=limit_req["side"],
-                            price=limit_req["price"],
-                            quantity=limit_req["qty"],
+                            side=side,
+                            price=price,
+                            quantity=qty,
                             order_id=limit_req["id"],
-                            user_id=limit_req["user_id"],
+                            user_id=user_id,
                         )
+
+                        # Settle: Confirm trades in Economy
+                        for trade in trades:
+                            economy.confirm_trade(
+                                buyer_id=trade.buyer_id,
+                                seller_id=trade.seller_id,
+                                price=trade.price,
+                                quantity=trade.quantity,
+                            )
 
                         resp = {
                             "status": "accepted",
@@ -94,6 +158,11 @@ async def handle_client(
                         # resp = {"status": "accepted"}
 
                     except ValueError as e:
+                        # If engine rejects order (eg market closed),
+                        # then we unlocked the funds that were just locked.
+                        if side == "buy":
+                            economy.release_order_lock(user_id, price, qty)
+
                         # Error Response (Market is Closed)
                         print(f"[{addr}] Rejected: {e}")
                         resp = {"status": "error", "message": str(e)}
@@ -102,17 +171,32 @@ async def handle_client(
                     # TODO: Need to know which market this order is in
                     # Right now: search all markets
                     order_id = request["id"]
-                    cancelled = False
+                    cancelled_order = None
+                    # cancelled = False
+
+                    # Search all markets
+                    # TODO: optimize
                     for market_id, book in engine._markets.items():
                         if order_id in book._orders:
+                            # Get order details before cancelling
+                            # to know how much money to unlock.
+                            order = book._orders[order_id]
                             book.cancel_order(order_id)
-                            cancelled = True
+                            cancelled_order = order
                             break
 
-                    resp = {
-                        "status": "cancelled" if cancelled else "error",
-                        "message": "Order not found" if not cancelled else "",
-                    }
+                    if cancelled_order:
+                        # Refund: Release lock if it was a buy order.
+                        if cancelled_order.side == "buy":  # or Side.BUY
+                            economy.release_order_lock(
+                                user_id=cancelled_order.user_id,
+                                price=cancelled_order.price,
+                                quantity=cancelled_order.quantity,
+                            )
+
+                        resp = {"status": "cancelled", "message": "Funds released"}
+                    else:
+                        resp = {"status": "error", "message": "Order not found"}
 
                     # market.cancel_order(request["id"])
                     # resp = {"status": "cancelled"}
@@ -128,7 +212,7 @@ async def handle_client(
                             asks=[],
                         )
                     else:
-                        # Get first market (you'll want to specify market_id later)
+                        # Get first market (will want to specify market_id later)
                         first_market_id = next(iter(engine._markets.keys()))
                         snap = engine.get_market_snapshot(first_market_id)
 
@@ -157,6 +241,15 @@ async def handle_client(
                             "actual_screentime_minutes"
                         ],
                     )
+
+                    # Settle these finalized trades in economy too.
+                    for trade in all_trades:
+                        economy.confirm_trade(
+                            buyer_id=trade.buyer_id,
+                            seller_id=trade.seller_id,
+                            price=trade.price,
+                            quantity=trade.quantity,
+                        )
 
                     resp = {
                         "status": "settled",
