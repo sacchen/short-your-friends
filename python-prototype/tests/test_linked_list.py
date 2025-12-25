@@ -1,11 +1,12 @@
 # tests/test_linked_list.py
 # Usage: uv run pytest
+
 from orderbook.linked_list import OrderList
 from orderbook.node import OrderNode
 
 
 def create_order(id: int, qty: int) -> OrderNode:
-    return OrderNode(order_id=id, price=100, quantity=qty, timestamp=1.0)
+    return OrderNode(order_id=id, user_id=0, price=100, quantity=qty, timestamp=1.0)
 
 
 def test_append_updates_volume():

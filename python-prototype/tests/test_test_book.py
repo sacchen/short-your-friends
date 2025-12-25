@@ -6,9 +6,9 @@ from orderbook.book import OrderBook
 def test_bid_priority():
     book = OrderBook()
     # Add bids at different prices
-    book.add_order("buy", 100, 10, 1)
-    book.add_order("buy", 105, 10, 2)
-    book.add_order("buy", 95, 10, 3)
+    book.add_order("buy", 100, 10, 1, user_id=1)
+    book.add_order("buy", 105, 10, 2, user_id=2)
+    book.add_order("buy", 95, 10, 3, user_id=3)
 
     # Best bid should be 105 (Highest)
     assert book.get_best_bid() == 105
@@ -17,9 +17,9 @@ def test_bid_priority():
 def test_ask_priority():
     book = OrderBook()
     # Add asks at different prices
-    book.add_order("sell", 100, 10, 1)
-    book.add_order("sell", 105, 10, 2)
-    book.add_order("sell", 95, 10, 3)
+    book.add_order("sell", 100, 10, 1, user_id=1)
+    book.add_order("sell", 105, 10, 2, user_id=2)
+    book.add_order("sell", 95, 10, 3, user_id=3)
 
     # Best ask should be 95 (Lowest)
     assert book.get_best_ask() == 95
@@ -27,8 +27,8 @@ def test_ask_priority():
 
 def test_lazy_deletion_bids():
     book = OrderBook()
-    book.add_order("buy", 100, 10, 1)  # Best price
-    book.add_order("buy", 99, 10, 2)  # Second best
+    book.add_order("buy", 100, 10, 1, user_id=1)  # Best price
+    book.add_order("buy", 99, 10, 2, user_id=2)  # Second best
 
     assert book.get_best_bid() == 100
 
@@ -42,8 +42,8 @@ def test_lazy_deletion_bids():
 
 def test_lazy_deletion_asks():
     book = OrderBook()
-    book.add_order("sell", 100, 10, 1)  # Best price
-    book.add_order("sell", 101, 10, 2)  # Second best
+    book.add_order("sell", 100, 10, 1, user_id=1)  # Best price
+    book.add_order("sell", 101, 10, 2, user_id=2)  # Second best
 
     assert book.get_best_ask() == 100
 
@@ -66,13 +66,13 @@ def test_time_priority_fifo():
     book = OrderBook()
 
     # 1. Alice (Early Bird)
-    book.process_order("sell", 100, 10, 1)
+    book.process_order("sell", 100, 10, 1, user_id=1)
 
     # 2. Bob (Late Arrival)
-    book.process_order("sell", 100, 10, 2)
+    book.process_order("sell", 100, 10, 2, user_id=2)
 
     # 3. Charlie (Taker)
-    trades = book.process_order("buy", 100, 10, 3)
+    trades = book.process_order("buy", 100, 10, 3, user_id=3)
 
     assert len(trades) == 1
     trade = trades[0]

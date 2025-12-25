@@ -2,7 +2,7 @@
 
 # Usage:
 # Start server: PYTHONPATH=src uv run server.py
-# Start test:   uv run test_integration.py
+# Start test:   uv run pytest tests/test_integration.py
 
 import json
 import socket
@@ -26,7 +26,7 @@ def send_request(sock, request_dict):
     return json.loads(data.decode().strip())
 
 
-def run_test():
+def test_integration():
     host = "127.0.0.1"
     port = 8888
 
@@ -105,4 +105,4 @@ def run_test():
 
 
 if __name__ == "__main__":
-    run_test()
+    test_integration()
