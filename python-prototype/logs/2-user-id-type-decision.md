@@ -58,7 +58,7 @@ Use `UserIdMapper` class for conversion
 - Economy uses `str`
 - Engine uses `int`
 
-- About to add `UserIdMapper` at boundary
-- Then update `server.py` to use mapper
+- DONE: About to add `UserIdMapper` at boundary
+- DONE: Then update `server.py` to use mapper
 - Update types
 - Add mapper tests

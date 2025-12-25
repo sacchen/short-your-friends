@@ -9,6 +9,7 @@ from orderbook.economy import EconomyManager
 
 # from orderbook.book import OrderBook
 from orderbook.engine import MarketId, MatchingEngine
+from orderbook.id_mapper import UserIdMapper
 from orderbook.types import (
     ActionResponse,
     LimitOrderRequest,
@@ -26,6 +27,7 @@ ResponseTypes = Union[
 # market = OrderBook()
 engine = MatchingEngine()
 economy = EconomyManager()
+user_id_mapper = UserIdMapper()
 
 
 async def handle_client(
@@ -93,14 +95,14 @@ async def handle_client(
                     limit_req: LimitOrderRequest = request
 
                     # Extract Data
-                    user_id = str(limit_req["user_id"])
+                    user_id_str = str(limit_req["user_id"])
                     price = Decimal(str(limit_req["price"]))
                     qty = int(limit_req["qty"])
                     side = limit_req["side"]
 
                     # Check Funds for Buys
                     if side == "buy":
-                        if not economy.attempt_order_lock(user_id, price, qty):
+                        if not economy.attempt_order_lock(user_id_str, price, qty):
                             resp = {
                                 "status": "error",
                                 "message": f"Insufficient funds. Need {price * qty}",
@@ -118,6 +120,9 @@ async def handle_client(
                     )
 
                     try:
+                        # Convert to internal ID for matching engine
+                        user_id_int = user_id_mapper.to_internal(user_id_str)
+
                         # Process order (matches immediately if possible)
                         trades = engine.process_order(
                             # market_id=market_id,
@@ -131,14 +136,16 @@ async def handle_client(
                             price=int(price),
                             quantity=qty,
                             order_id=limit_req["id"],
-                            user_id=int(user_id),
+                            user_id=user_id_int,
                         )
 
                         # Settle: Confirm trades in Economy
                         for trade in trades:
+                            buyer_str = user_id_mapper.to_external(trade.buy_user_id)
+                            seller_str = user_id_mapper.to_external(trade.sell_user_id)
                             economy.confirm_trade(
-                                buyer_id=str(trade.buy_user_id),
-                                seller_id=str(trade.sell_user_id),
+                                buyer_id=buyer_str,
+                                seller_id=seller_str,
                                 price=Decimal(trade.price),
                                 quantity=trade.quantity,
                             )
@@ -198,6 +205,10 @@ async def handle_client(
                     if cancelled_order:
                         # Refund: Release lock if it was a buy order.
                         if cancelled_side == "buy":  # Using tracked side
+                            # Convert internal ID back to string for Economy
+                            user_id_str = user_id_mapper.to_external(
+                                cancelled_order.user_id
+                            )
                             economy.release_order_lock(
                                 user_id=str(cancelled_order.user_id),
                                 price=Decimal(cancelled_order.price),
@@ -254,9 +265,11 @@ async def handle_client(
 
                     # Settle: Confirm trades in Economy
                     for trade in all_trades:
+                        buyer_str = user_id_mapper.to_external(trade.buy_user_id)
+                        seller_str = user_id_mapper.to_external(trade.sell_user_id)
                         economy.confirm_trade(
-                            buyer_id=str(trade.buy_user_id),
-                            seller_id=str(trade.sell_user_id),
+                            buyer_id=buyer_str,
+                            seller_id=seller_str,
                             price=Decimal(trade.price),
                             quantity=trade.quantity,
                         )
