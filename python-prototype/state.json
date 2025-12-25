@@ -7,6 +7,10 @@
     "1": {
       "available": "0.00",
       "locked": "0.00"
+    },
+    "ios_user": {
+      "available": "200.00",
+      "locked": "0.00"
     }
   },
   "engine": {}
