@@ -28,7 +28,7 @@ struct ContentView: View {
                 Text(client.isConnected ? "Online" : "Offline")
             }
             
-            Text(client.lastMessage)
+            Text(client.log)
                 .font(.caption)
                 .foregroundStyle(.gray)
                 .padding()

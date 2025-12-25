@@ -9,9 +9,13 @@ import SwiftUI
 
 @main
 struct ShortYourFriendsApp: App {
+    // Create client
+    @StateObject var client = NetworkClient()
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            // ContentView()
+            MarketListView(client: client)
         }
     }
 }
