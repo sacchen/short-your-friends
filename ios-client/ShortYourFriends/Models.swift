@@ -30,6 +30,7 @@ struct Market: Codable, Identifiable {
 // Wrapper for response logic
 // To detect what server sent us
 struct GenericResponse: Decodable {
+    let status: String?
     let type: String?       // TODO: Add to Python responses later
     let markets: [Market]?
     let balance: Double?

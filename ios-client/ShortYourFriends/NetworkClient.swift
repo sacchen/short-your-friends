@@ -113,7 +113,7 @@ class NetworkClient: ObservableObject {
             incomingBuffer.removeSubrange(..<range.upperBound)
             
             // Handle complete JSON string
-            handleMesage(message)
+            handleMessage(message)
         }
     }
     
@@ -123,6 +123,26 @@ class NetworkClient: ObservableObject {
         
         // Decode on main thread so UI updates instantly
         DispatchQueue.main.async {
+            // Decode Wrapper (GenericResponse), not Array
+            if let response = try? JSONDecoder().decode(GenericResponse.self, from: data) {
+                
+                // If response contains list of markets, update state
+                if let receivedMarkets = response.markets {
+                    self.markets = receivedMarkets
+                    self.log = "Updated \(receivedMarkets.count) markets"
+                    return
+                }
+                
+                // If just status update (eg placing order)
+                if let status = response.status {
+                    self.log = "Server: \(status)"
+                    return
+                }
+            }
+            
+            // Fallback
+            self.log = "Unknown Msg: \(jsonString)"
+            
             // Attempt decode as a List of Markets ("Get Markets" response)
             // Check "type" field first in the future
             if let marketList = try? JSONDecoder().decode([Market].self, from: data) {
