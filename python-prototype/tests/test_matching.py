@@ -13,12 +13,16 @@ def test_full_match_buy_side():
     book = OrderBook()
 
     # 1. Maker (Seller)
-    trades_1 = book.process_order(side="sell", price=100, quantity=10, order_id=1)
+    trades_1 = book.process_order(
+        side="sell", price=100, quantity=10, order_id=1, user_id=1
+    )
     assert len(trades_1) == 0
     assert book.get_best_ask() == 100
 
     # 2. Taker (Buyer) matches fully
-    trades_2 = book.process_order(side="buy", price=100, quantity=10, order_id=2)
+    trades_2 = book.process_order(
+        side="buy", price=100, quantity=10, order_id=2, user_id=2
+    )
 
     # Assertions
     assert len(trades_2) == 1
@@ -47,10 +51,12 @@ def test_partial_match_price_improvement():
     book = OrderBook()
 
     # 1. Maker (Buyer)
-    book.process_order(side="buy", price=100, quantity=10, order_id=1)
+    book.process_order(side="buy", price=100, quantity=10, order_id=1, user_id=1)
 
     # 2. Taker (Seller) crossing the spread
-    trades = book.process_order(side="sell", price=90, quantity=5, order_id=2)
+    trades = book.process_order(
+        side="sell", price=90, quantity=5, order_id=2, user_id=2
+    )
 
     assert len(trades) == 1
     trade = trades[0]
@@ -83,11 +89,11 @@ def test_multi_level_sweep():
     book = OrderBook()
 
     # Setup the sell wall
-    book.process_order("sell", 100, 5, 1)
-    book.process_order("sell", 101, 5, 2)
+    book.process_order("sell", 100, 5, 1, user_id=1)
+    book.process_order("sell", 101, 5, 2, user_id=2)
 
     # Taker sweeps through levels
-    trades = book.process_order("buy", 102, 8, 3)
+    trades = book.process_order("buy", 102, 8, 3, user_id=3)
 
     assert len(trades) == 2
 
