@@ -93,7 +93,7 @@ async def handle_client(
                     limit_req: LimitOrderRequest = request
 
                     # Extract Data
-                    user_id = limit_req["user_id"]
+                    user_id = str(limit_req["user_id"])
                     price = Decimal(str(limit_req["price"]))
                     qty = int(limit_req["qty"])
                     side = limit_req["side"]
@@ -128,18 +128,18 @@ async def handle_client(
                             # user_id=limit_req["user_id"],
                             market_id=market_id,
                             side=side,
-                            price=price,
+                            price=int(price),
                             quantity=qty,
                             order_id=limit_req["id"],
-                            user_id=user_id,
+                            user_id=int(user_id),
                         )
 
                         # Settle: Confirm trades in Economy
                         for trade in trades:
                             economy.confirm_trade(
-                                buyer_id=trade.buyer_id,
-                                seller_id=trade.seller_id,
-                                price=trade.price,
+                                buyer_id=str(trade.buyer_id),
+                                seller_id=str(trade.seller_id),
+                                price=Decimal(trade.price),
                                 quantity=trade.quantity,
                             )
 
@@ -172,6 +172,7 @@ async def handle_client(
                     # Right now: search all markets
                     order_id = request["id"]
                     cancelled_order = None
+                    cancelled_side = None  # Track side separately
                     # cancelled = False
 
                     # Search all markets
@@ -181,16 +182,23 @@ async def handle_client(
                             # Get order details before cancelling
                             # to know how much money to unlock.
                             order = book._orders[order_id]
+
+                            # Determine side by checking which book it is in.
+                            if order.price in book._bids:
+                                cancelled_side = "buy"
+                            elif order.price in book._asks:
+                                cancelled_side = "sell"
+
                             book.cancel_order(order_id)
                             cancelled_order = order
                             break
 
                     if cancelled_order:
                         # Refund: Release lock if it was a buy order.
-                        if cancelled_order.side == "buy":  # or Side.BUY
+                        if cancelled_side == "buy":  # Using tracked side
                             economy.release_order_lock(
-                                user_id=cancelled_order.user_id,
-                                price=cancelled_order.price,
+                                user_id=str(cancelled_order.user_id),
+                                price=Decimal(cancelled_order.price),
                                 quantity=cancelled_order.quantity,
                             )
 
@@ -245,9 +253,9 @@ async def handle_client(
                     # Settle these finalized trades in economy too.
                     for trade in all_trades:
                         economy.confirm_trade(
-                            buyer_id=trade.buyer_id,
-                            seller_id=trade.seller_id,
-                            price=trade.price,
+                            buyer_id=str(trade.buy_user_id),
+                            seller_id=str(trade.sell_user_id),
+                            price=Decimal(trade.price),
                             quantity=trade.quantity,
                         )
 
