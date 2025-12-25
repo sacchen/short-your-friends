@@ -146,6 +146,7 @@ dev = [
 [package.metadata]
 
 [package.metadata.requires-dev]
+benchmark = []
 dev = [
     { name = "mypy", specifier = ">=1.19.0" },
     { name = "pytest", specifier = ">=9.0.2" },
