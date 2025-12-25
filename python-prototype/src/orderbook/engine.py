@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Dict, Tuple
+from typing import Any, Dict, Tuple
 
 from .book import OrderBook
 from .trade import Trade
@@ -60,3 +60,28 @@ class MatchingEngine:
         if market_id not in self._markets:
             return {"bids": [], "asks": []}
         return self._markets[market_id].snapshot()
+
+    def get_active_markets(self) -> list[dict[str, Any]]:
+        """
+        Returns list of active markets for API.
+        """
+        results = []
+        for market_id, book in self._markets.items():
+            target_user, minutes = market_id
+
+            # Get best prices for the "ticker"
+            best_bid = book.bids[0].price if book.bids else None
+            best_ask = book.asks[0].price if book.asks else None
+
+            results.append(
+                {
+                    "target_user": target_user,
+                    "threshold_minutes": minutes,
+                    "best_bid": str(best_bid) if best_bid else None,
+                    "best_ask": str(best_ask) if best_ask else None,
+                    "volume": 0,  # TODO: track volume
+                }
+            )
+        return results
+
+    # TODO: add get_market_details() that returns graph data/history

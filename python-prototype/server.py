@@ -286,6 +286,12 @@ async def handle_client(
                         "total_trades": len(all_trades),
                     }
 
+                elif request["type"] == "get_markets":
+                    # No params. Just list.
+                    market_list = engine.get_active_markets()
+
+                    resp = {"status": "ok", "markets": market_list}
+
                 else:
                     resp = {
                         "status": "error",
