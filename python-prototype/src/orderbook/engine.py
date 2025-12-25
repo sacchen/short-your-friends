@@ -18,11 +18,20 @@ class MatchingEngine:
     """
 
     _markets: Dict[MarketId, OrderBook] = field(default_factory=dict)
+    _market_names: Dict[MarketId, str] = field(default_factory=dict)
 
     def get_or_create_market(self, market_id: MarketId) -> OrderBook:
         if market_id not in self._markets:
             self._markets[market_id] = OrderBook()
         return self._markets[market_id]
+
+    def create_market(self, market_id: MarketId, name: str) -> None:
+        """
+        Creates a market with a display name.
+        Is called by Seed Data in server.
+        """
+        self.get_or_create_market(market_id)
+        self._market_names[market_id] = name
 
     def process_order(
         self,
@@ -66,24 +75,33 @@ class MatchingEngine:
         """
         Returns list of active markets for API.
         """
-        results = []
+        market_list = []
         for market_id, book in self._markets.items():
+            # Use max() for best bid and min() for best ask
+            # book._bids is a dict {price: OrderNode}, so we look at .keys()
+
+            best_bid = max(book._bids.keys()) if book._bids else None
+            best_ask = min(book._asks.keys()) if book._asks else None
+
             target_user, minutes = market_id
 
-            # Get best prices for the "ticker"
-            best_bid = book.bids[0].price if book.bids else None
-            best_ask = book.asks[0].price if book.asks else None
+            # Use stored name or fallback to default string
+            display_name = self._market_names.get(
+                market_id, f"{target_user} > {minutes}m"
+            )
 
-            results.append(
+            market_list.append(
                 {
+                    "id": f"{target_user}_{minutes}",  # Unique ID for SwiftUI
+                    "name": display_name,
                     "target_user": target_user,
                     "threshold_minutes": minutes,
-                    "best_bid": str(best_bid) if best_bid else None,
-                    "best_ask": str(best_ask) if best_ask else None,
+                    "best_bid": str(best_bid) if best_bid is not None else None,
+                    "best_ask": str(best_ask) if best_ask is not None else None,
                     "volume": 0,  # TODO: track volume
                 }
             )
-        return results
+        return market_list
 
     # TODO: add get_market_details() that returns graph data/history
 
