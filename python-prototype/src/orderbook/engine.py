@@ -119,8 +119,8 @@ class MatchingEngine:
                 ]
 
             state[key] = {
-                "bids": serialize_orders(book.bids),
-                "asks": serialize_orders(book.asks),
+                "bids": serialize_orders(book._bids),
+                "asks": serialize_orders(book._asks),
             }
         return state
 
