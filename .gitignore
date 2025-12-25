@@ -5,9 +5,20 @@ build/
 dist/
 wheels/
 *.egg-info
+state.json
+
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
 
 # Virtual environments
 .venv
+
+# Swift / Xcode
+build/
+DerivedData/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xccheckout
+*.moved-aside
+*.xcuserstate
+
