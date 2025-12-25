@@ -137,8 +137,8 @@ async def handle_client(
                         # Settle: Confirm trades in Economy
                         for trade in trades:
                             economy.confirm_trade(
-                                buyer_id=str(trade.buyer_id),
-                                seller_id=str(trade.seller_id),
+                                buyer_id=str(trade.buy_user_id),
+                                seller_id=str(trade.sell_user_id),
                                 price=Decimal(trade.price),
                                 quantity=trade.quantity,
                             )
@@ -172,7 +172,9 @@ async def handle_client(
                     # Right now: search all markets
                     order_id = request["id"]
                     cancelled_order = None
-                    cancelled_side = None  # Track side separately
+                    cancelled_side = (
+                        None  # Track side separately. OrderNode doesn't store it
+                    )
                     # cancelled = False
 
                     # Search all markets
@@ -250,7 +252,7 @@ async def handle_client(
                         ],
                     )
 
-                    # Settle these finalized trades in economy too.
+                    # Settle: Confirm trades in Economy
                     for trade in all_trades:
                         economy.confirm_trade(
                             buyer_id=str(trade.buy_user_id),

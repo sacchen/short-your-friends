@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Dict
 
@@ -10,21 +10,24 @@ DOOMSCROLL_TAX_RATE = Decimal("5.00")  # Credits burned per hour
 class Account:
     user_id: str
     # Total equity = available + locked
-    balance_available: Decimal = Decimal("0.00")
-    balance_locked: Decimal = Decimal("0.00")  # Money in active buy orders
+    balance_available: Decimal = field(default_factory=lambda: Decimal("0.00"))
+    balance_locked: Decimal = field(
+        default_factory=lambda: Decimal("0.00")
+    )  # Money in active buy orders
 
     def total_equity(self) -> Decimal:
-        return self.balance_available + self.self.balance_locked
+        # result: Decimal = self.balance_available + self.balance_locked
+        return self.balance_available + self.balance_locked
 
 
 class EconomyManager:
-    def __init__(self):
+    def __init__(self) -> None:
         self.accounts: Dict[str, Account] = {}
 
     def get_account(self, user_id: str) -> Account:
         if user_id not in self.accounts:
             self.accounts[user_id] = Account(user_id=user_id)
-            return self.accounts[user_id]
+        return self.accounts[user_id]
 
     # Game Mechanics (Mint/Burn)
 
@@ -34,7 +37,7 @@ class EconomyManager:
         Returns the amount minted.
         """
         account = self.get_account(user_id)
-        reward = Decimal(steps) * self.STEPS_REWARD_RATE
+        reward = Decimal(steps) * STEPS_REWARD_RATE
         account.balance_available += reward
         return reward
         # print(f"User {user_id} walked {steps} steps. Minted {reward} credits.")
@@ -109,7 +112,7 @@ class EconomyManager:
         seller = self.get_account(seller_id)
         seller.balance_available += cost
 
-    def distribute_ubi(self, amount: Decimal = Decimal("100.00")):
+    def distribute_ubi(self, amount: Decimal = Decimal("100.00")) -> None:
         """Give everyone their daily bread."""
         for user_id in self.accounts:
             self.accounts[user_id].balance_available += amount
