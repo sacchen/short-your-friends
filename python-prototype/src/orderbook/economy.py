@@ -118,3 +118,24 @@ class EconomyManager:
             self.accounts[user_id].balance_available += amount
         # TODO: need database/timestamp log of last distribution
         # so function doesn't run every time server restarts
+
+    # save to JSON for Persistence
+    def dump_state(self) -> dict:
+        """Export all accounts to dictionary."""
+        return {
+            user_id: {
+                "available": str(acc.balance_available),
+                "locked": str(acc.balance_locked),
+            }
+            for user_id, acc in self.accounts.items()  # keys, values
+            # acc is the Value (`Account` object)
+        }
+
+    def load_state(self, data: dict) -> None:
+        """Restore accounts from dictionary."""
+        self.accounts.clear()
+        for user_id, balances in data.items():
+            acc = Account(user_id=user_id)
+            acc.balance_available = Decimal(balances["available"])
+            acc.balance_locked = Decimal(balances["locked"])
+            self.accounts[user_id] = acc
