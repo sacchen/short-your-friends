@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 from decimal import Decimal
 from typing import Any, Union
 
@@ -345,9 +346,50 @@ async def main() -> None:
         await server.serve_forever()
 
 
+# Stop and load JSON when we start.
+# To test,
+# run server, run test_integration.py, stop server,
+# check state.json, start server
+
+DB_FILE = "state.json"
+
+
+def save_world():
+    print("[*] Saving world state...")
+    data = {"economy": economy.dump_state(), "engine": engine.dump_state()}
+    with open(DB_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+    print("[*] Save complete.")
+
+
+def load_world():
+    if not os.path.exists(DB_FILE):
+        print("[*] No save file found. Starting fresh.")
+        return
+
+    print("[*] Loading world state...")
+    try:
+        with open(DB_FILE, "r") as f:
+            data = json.load(f)
+
+        if "economy" in data:
+            economy.load_state(data["economy"])
+        if "engine" in data:
+            engine.load_state(data["engine"])
+
+        print(
+            f"[*] Loaded {len(economy.accounts)} accounts and {len(engine._markets)} markets."
+        )
+    except Exception as e:
+        print(f"[!] Failed to load save file: {e}")
+
+
 if __name__ == "__main__":
     try:
+        load_world()  # Load on start
         # Run event loop
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n[!] Server stopped.")
+        print("\n[!] Stopping server...")
+        save_world()
+        print("[!] Server stopped.")
