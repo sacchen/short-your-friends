@@ -4,6 +4,11 @@
 # check state.json, start server
 # uv run pytest tests/test_integration.py
 
+# in terminal. to place buy order for 5 shares at 41 cents
+# echo '{"type": "place_order", "market_id": "alice_480", "user_id": "test_user_1", "side": "buy", "price": 41, "qty": 5, "id": 999}' | nc localhost 8888
+# buy 2 contracts at 60 cents
+# echo '{"type": "place_order", "market_id": "alice_480", "user_id": "test_user_1", "side": "buy", "price": 60, "qty": 2, "id": 1002}' | nc localhost 8888
+
 import asyncio
 import json
 import os
@@ -13,11 +18,10 @@ from typing import Any, Union
 from orderbook.economy import EconomyManager
 
 # from orderbook.book import OrderBook
-from orderbook.engine import MarketId, MatchingEngine
+from orderbook.engine import MatchingEngine
 from orderbook.id_mapper import UserIdMapper
 from orderbook.types import (
     ActionResponse,
-    LimitOrderRequest,
     SettleMarketRequest,
     SettlementResponse,
     SnapshotResponse,
@@ -81,70 +85,58 @@ async def handle_client(
                         "new_balance": str(new_balance),
                     }
 
-                elif request["type"] == "balance":
-                    # {"type": "balance", "user_id": "alice"}
-                    user_id = request["user_id"]
-                    account = economy.get_account(user_id)
-                    resp = {
-                        "status": "ok",
-                        "user_id": user_id,
-                        "available": str(account.balance_available),
-                        "locked": str(account.balance_locked),
-                        "total_equity": str(account.total_equity()),
-                    }
-                # Trading Logic with Economy Checks
-                # Switchboard (Routing logic to Engine)
-                elif request["type"] == "limit":
-                    # Need auth/session in future
-                    # user_id = int(request.get("user_id", 0))
-                    limit_req: LimitOrderRequest = request
-
-                    # Extract Data
-                    user_id_str = str(limit_req["user_id"])
-                    price = Decimal(str(limit_req["price"]))
-                    qty = int(limit_req["qty"])
-                    side = limit_req["side"]
-
-                    # Check Funds for Buys
-                    if side == "buy":
-                        if not economy.attempt_order_lock(user_id_str, price, qty):
-                            resp = {
-                                "status": "error",
-                                "message": f"Insufficient funds. Need {price * qty}",
-                            }
-                            # Send error and skip the rest
-                            writer.write((json.dumps(resp) + "\n").encode())
-                            await writer.drain()
-                            continue
-
-                    # Extract market_id from request
-                    market_id_dict = limit_req["market_id"]
-                    market_id: MarketId = (
-                        market_id_dict["target_user_id"],
-                        market_id_dict["threshold_minutes"],
-                    )
+                elif request["type"] == "place_order":
+                    # Expects: {"type": "place_order", "market_id": "alice_480",
+                    #           "user_id": "test_user_1", "side": "buy", "price": 40, "qty": 5}
 
                     try:
-                        # Convert to internal ID for matching engine
+                        # Parse Market ID (String "alice_480" -> Tuple ("alice", 480))
+                        # Use rsplit to handle usernames that might contain underscores
+                        raw_market_id = request["market_id"]
+                        if "_" in raw_market_id:
+                            target_user, minutes_str = raw_market_id.rsplit("_", 1)
+                        else:
+                            # Fallback if we change ID format later
+                            target_user, minutes_str = raw_market_id.split(",")
+
+                        market_id = (target_user, int(minutes_str))
+
+                        # Extract Order Details
+                        user_id_str = str(request["user_id"])
+                        side = request["side"]
+                        price_int = int(request["price"])  # Engine uses Int (cents)
+                        price_decimal = Decimal(str(request["price"])) / 100
+                        qty = int(request["qty"])
+
+                        # Economy Check: Lock funds for Buys
+                        if side == "buy":
+                            # attempt_order_lock expects string ID and Decimal price
+                            if not economy.attempt_order_lock(
+                                user_id_str, price_decimal, qty
+                            ):
+                                error_msg = f"Insufficient funds. Need ${price_decimal * qty / 100:.2f}"
+                                print(f"[{addr}] Order Rejected: {error_msg}")
+                                resp = {"status": "error", "message": error_msg}
+                                writer.write((json.dumps(resp) + "\n").encode())
+                                await writer.drain()
+                                continue
+
+                        # Execute in Matching Engine
+                        # Map "test_user_1" -> 2 (Internal Integer ID)
                         user_id_int = user_id_mapper.to_internal(user_id_str)
 
-                        # Process order (matches immediately if possible)
                         trades = engine.process_order(
-                            # market_id=market_id,
-                            # side=limit_req["side"],
-                            # price=limit_req["price"],
-                            # quantity=limit_req["qty"],
-                            # order_id=limit_req["id"],
-                            # user_id=limit_req["user_id"],
                             market_id=market_id,
                             side=side,
-                            price=int(price),
+                            price=price_int,
                             quantity=qty,
-                            order_id=limit_req["id"],
+                            order_id=request.get(
+                                "id", 0
+                            ),  # Client should ideally send an ID, or we gen one
                             user_id=user_id_int,
                         )
 
-                        # Settle: Confirm trades in Economy
+                        # Settlement: Confirm any resulting trades
                         for trade in trades:
                             buyer_str = user_id_mapper.to_external(trade.buy_user_id)
                             seller_str = user_id_mapper.to_external(trade.sell_user_id)
@@ -155,29 +147,128 @@ async def handle_client(
                                 quantity=trade.quantity,
                             )
 
+                        print(f"[{addr}] Order Placed. Trades executed: {len(trades)}")
                         resp = {
-                            "status": "accepted",
-                            "message": f"Order placed, {len(trades)} trades executed",
+                            "status": "ok",
+                            "message": "Order placed successfully",
+                            "trades": len(trades),
                         }
 
-                        # market.add_order(
-                        #     side=request["side"],
-                        #     price=request["price"],
-                        #     quantity=request["qty"],
-                        #     order_id=request["id"],
-                        #     user_id=user_id,
-                        # )
-                        # resp = {"status": "accepted"}
-
                     except ValueError as e:
-                        # If engine rejects order (eg market closed),
-                        # then we unlocked the funds that were just locked.
-                        if side == "buy":
-                            economy.release_order_lock(user_id, price, qty)
+                        # If the engine rejects it (e.g. "Market Closed"), unlock the funds
+                        if request["side"] == "buy":
+                            economy.release_order_lock(
+                                user_id_str,
+                                Decimal(str(request["price"])),
+                                int(request["qty"]),
+                            )
 
-                        # Error Response (Market is Closed)
-                        print(f"[{addr}] Rejected: {e}")
+                        print(f"[{addr}] Engine Error: {e}")
                         resp = {"status": "error", "message": str(e)}
+
+                    except Exception as e:
+                        print(f"[{addr}] Unexpected Error: {e}")
+                        import traceback
+
+                        traceback.print_exc()
+                        resp = {"status": "error", "message": "Internal server error"}
+                    # elif request["type"] == "balance":
+                    #     # {"type": "balance", "user_id": "alice"}
+                    #     user_id = request["user_id"]
+                    #     account = economy.get_account(user_id)
+                    #     resp = {
+                    #         "status": "ok",
+                    #         "user_id": user_id,
+                    #         "available": str(account.balance_available),
+                    #         "locked": str(account.balance_locked),
+                    #         "total_equity": str(account.total_equity()),
+                    #     }
+                    # # Trading Logic with Economy Checks
+                    # # Switchboard (Routing logic to Engine)
+                    # elif request["type"] == "limit":
+                    #     # Need auth/session in future
+                    #     # user_id = int(request.get("user_id", 0))
+                    #     limit_req: LimitOrderRequest = request
+
+                    #     # Extract Data
+                    #     user_id_str = str(limit_req["user_id"])
+                    #     price = Decimal(str(limit_req["price"]))
+                    #     qty = int(limit_req["qty"])
+                    #     side = limit_req["side"]
+
+                    #     # Check Funds for Buys
+                    #     if side == "buy":
+                    #         if not economy.attempt_order_lock(user_id_str, price, qty):
+                    #             resp = {
+                    #                 "status": "error",
+                    #                 "message": f"Insufficient funds. Need {price * qty}",
+                    #             }
+                    #             # Send error and skip the rest
+                    #             writer.write((json.dumps(resp) + "\n").encode())
+                    #             await writer.drain()
+                    #             continue
+
+                    #     # Extract market_id from request
+                    #     market_id_dict = limit_req["market_id"]
+                    #     market_id: MarketId = (
+                    #         market_id_dict["target_user_id"],
+                    #         market_id_dict["threshold_minutes"],
+                    #     )
+
+                    #     try:
+                    #         # Convert to internal ID for matching engine
+                    #         user_id_int = user_id_mapper.to_internal(user_id_str)
+
+                    #         # Process order (matches immediately if possible)
+                    #         trades = engine.process_order(
+                    #             # market_id=market_id,
+                    #             # side=limit_req["side"],
+                    #             # price=limit_req["price"],
+                    #             # quantity=limit_req["qty"],
+                    #             # order_id=limit_req["id"],
+                    #             # user_id=limit_req["user_id"],
+                    #             market_id=market_id,
+                    #             side=side,
+                    #             price=int(price),
+                    #             quantity=qty,
+                    #             order_id=limit_req["id"],
+                    #             user_id=user_id_int,
+                    #         )
+
+                    #         # Settle: Confirm trades in Economy
+                    #         for trade in trades:
+                    #             buyer_str = user_id_mapper.to_external(trade.buy_user_id)
+                    #             seller_str = user_id_mapper.to_external(trade.sell_user_id)
+                    #             economy.confirm_trade(
+                    #                 buyer_id=buyer_str,
+                    #                 seller_id=seller_str,
+                    #                 price=Decimal(trade.price),
+                    #                 quantity=trade.quantity,
+                    #             )
+
+                    #         resp = {
+                    #             "status": "accepted",
+                    #             "message": f"Order placed, {len(trades)} trades executed",
+                    #         }
+
+                    #         # market.add_order(
+                    #         #     side=request["side"],
+                    #         #     price=request["price"],
+                    #         #     quantity=request["qty"],
+                    #         #     order_id=request["id"],
+                    #         #     user_id=user_id,
+                    #         # )
+                    #         # resp = {"status": "accepted"}
+
+                    # except ValueError as e:
+                    #     # If engine rejects order (eg market closed),
+                    #     # then we unlocked the funds that were just locked.
+                    #     if side == "buy":
+                    #         economy.release_order_lock(user_id, price, qty)
+
+                    #     # Error Response (Market is Closed)
+                    #     print(f"[{addr}] Rejected: {e}")
+                    #     resp = {"status": "error", "message": str(e)}
 
                 elif request["type"] == "cancel":
                     # TODO: Need to know which market this order is in
@@ -298,7 +389,7 @@ async def handle_client(
                     resp = {"status": "ok", "markets": market_list}
 
                     # Debug: print json we're sending
-                    print(f"DEBUG OUTGOING JSON: {json.dumps(resp)}")
+                    # print(f"DEBUG OUTGOING JSON: {json.dumps(resp)}")
 
                 else:
                     resp = {
