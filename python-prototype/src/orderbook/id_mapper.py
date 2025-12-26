@@ -5,16 +5,12 @@ API/Economy layers use string IDs
 and matching engine uses integer IDs for performance.
 """
 
-from typing import Dict
+from typing import Any, Dict
 
 
 class UserIdMapper:
     """
     Maps string user IDs to internal integer IDs.
-
-    - API/Economy layers use string IDs
-      and matching engine uses integer IDs for performance.
-    - Boundary
     """
 
     def __init__(self) -> None:
@@ -25,12 +21,7 @@ class UserIdMapper:
     def to_internal(self, user_id: str) -> int:
         """
         Convert string user_id to internal integer ID.
-
         Creates a new mapping if the user_id hasn't been seen before.
-
-        Input: user_id: str (eg "alice", "test_user_1")
-
-        Returns internal integer ID for matching engine
         """
         if user_id not in self._str_to_int:
             internal_id = self._next_id
@@ -42,13 +33,9 @@ class UserIdMapper:
     def to_external(self, internal_id: int) -> str:
         """
         Convert internal integer ID back to string user_id.
-
-        Input: internal_id: Internal integer ID from matching engine
-
-        Returns original string user_id
-
-        Raises KeyError: If internal_id hasn't been mapped yet
         """
+        if internal_id not in self._int_to_str:
+            raise KeyError(f"Unknown internal ID: {internal_id}")
         return self._int_to_str[internal_id]
 
     def has_external(self, user_id: str) -> bool:
@@ -58,3 +45,20 @@ class UserIdMapper:
     def has_internal(self, internal_id: int) -> bool:
         """Check if an internal ID has been mapped."""
         return internal_id in self._int_to_str
+
+    # Persistence Methods for server.py
+
+    def dump_state(self) -> Dict[str, Any]:
+        """Return state dict for JSON saving."""
+        return {"map": self._str_to_int, "next_id": self._next_id}
+
+    def load_state(self, state: Dict[str, Any]) -> None:
+        """Restore state from JSON dict."""
+        self._str_to_int = state.get("map", {})
+        self._next_id = state.get("next_id", 1)
+
+        # Rebuild the reverse map (internal -> external)
+        # JSON loads keys as strings, but values remain ints (which is what we want)
+        self._int_to_str = {}
+        for k, v in self._str_to_int.items():
+            self._int_to_str[v] = k

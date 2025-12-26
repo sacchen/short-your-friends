@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from decimal import Decimal
 from typing import Any, Dict, Tuple
 
 from .book import OrderBook
@@ -107,7 +106,7 @@ class MatchingEngine:
 
     def dump_state(self) -> dict:
         """
-        Serializes the exchange state to JSON.
+        Serializes all markets and their order books to JSON.
         Structure:
         {
             "market_key_str": {
@@ -116,51 +115,109 @@ class MatchingEngine:
             }
         }
         """
-        state = {}
+        markets_data = {}
+
+        # Helper
+        def serialize_orders(orders_map, side_label):
+            serialized_list = []
+
+            # orders_map is {price: OrderNode}
+            # We use .values() to get the OrderNodes (not the price keys)
+            for order_list in orders_map.values():
+                curr = getattr(order_list, "head", None)
+
+                # Walk the linked list if there are multiple orders at this price
+                while curr:
+                    serialized_list.append(
+                        {
+                            "id": curr.order_id,
+                            "user_id": curr.user_id,
+                            "price": int(curr.price),
+                            "qty": curr.quantity,
+                            "side": side_label,
+                            # Safe check for timestamp
+                            "timestamp": getattr(curr, "timestamp", 0),
+                        }
+                    )
+                    # Move to next order in linked list (safe check)
+                    curr = getattr(curr, "next", None)
+            return serialized_list
+
         for market_id, book in self._markets.items():
             # Composite key needs to be a string for JSON
             # key is tuple before converting to string
             # key format: "user_id:minutes"
-            key = f"{market_id[0]}:{market_id[1]}"
-
-            # Helper to convert a list of Orders to dicts
-            def serialize_orders(orders):
-                return [
-                    {
-                        "id": o.order_id,
-                        "user_id": o.user_id,
-                        "price": str(o.price),
-                        "qty": o.quantity,
-                        "side": o.side,  # "buy" or "sell"
-                    }
-                    for o in orders
-                ]
-
-            state[key] = {
-                "bids": serialize_orders(book._bids),
-                "asks": serialize_orders(book._asks),
+            markets_data[market_id] = {
+                "name": self._market_names.get(market_id, "Unknown Market"),
+                "bids": serialize_orders(book._bids, "buy"),
+                "asks": serialize_orders(book._asks, "sell"),
             }
-        return state
 
-    def load_state(self, data: dict) -> None:
-        """Restores exchange state."""
+        return {"markets": markets_data}
+
+    def load_state(self, state):
+        """
+        Restores market state from JSON dictionary.
+        """
+        if "markets" not in state:
+            return
+
         self._markets.clear()
+        self._market_names.clear()
 
-        for key, book_data in data.items():
-            # Parse key "user_id:minutes" back to tuple
-            target_user, minutes_str = key.split(":")
-            market_id = (target_user, int(minutes_str))
+        for key_str, market_data in state["markets"].items():
+            try:
+                # Parse key: Handle the "alice,480" format from server.py
+                if "," in key_str:
+                    target_user, minutes_str = key_str.split(",")
+                elif ":" in key_str:
+                    target_user, minutes_str = key_str.split(":")
+                else:
+                    # If it's just a raw tuple string or weird format, skip or log
+                    print(f"[!] Skipping invalid market key: {key_str}")
+                    continue
 
-            # Recreate orders
-            for side in ["bids", "asks"]:
-                for o_data in book_data.get(side, []):
-                    # Process as new orders to rebuild the book structures
-                    # (safer than inserting into lists)
-                    self.process_order(
-                        market_id=market_id,
-                        side=o_data["side"],
-                        price=Decimal(o_data["price"]),
-                        quantity=int(o_data["qty"]),
-                        order_id=o_data["id"],
-                        user_id=o_data["user_id"],
-                    )
+                # Reconstruct Tuple ID
+                market_id = (target_user, int(minutes_str))
+
+                # Read name from JSON, or fallback to default
+                market_name = market_data.get("name", f"{target_user} > {minutes_str}m")
+
+                # Create market
+                self.create_market(market_id, market_name)
+                book = self._markets[market_id]
+
+                # Helper to restore orders
+                def restore_orders(order_list_data, side):
+                    for o_data in order_list_data:
+                        # Pass arguments explicitly. Previously was Node object
+                        book.add_order(
+                            side=side,
+                            price=o_data["price"],
+                            quantity=o_data["qty"],
+                            order_id=o_data["id"],
+                            user_id=o_data["user_id"],
+                        )
+                        # Create node
+                        # node = OrderNode(
+                        #     order_id=o_data["id"],
+                        #     user_id=o_data["user_id"],
+                        #     price=o_data["price"],
+                        #     quantity=o_data["qty"],
+                        #     timestamp=o_data.get("timestamp", 0),
+                        # )
+                        # # Add to book directly
+                        # book.add_order(node)
+
+                        # Restore original timestamp for FIFO priority
+                        # add_order() creates a new timestamp (now). We overwrite it
+                        # with the old one so the order keeps its place in line.
+                        if "timestamp" in o_data and o_data["id"] in book._orders:
+                            book._orders[o_data["id"]].timestamp = o_data["timestamp"]
+
+                # Restore Bids and Asks
+                restore_orders(market_data.get("bids", []), "buy")
+                restore_orders(market_data.get("asks", []), "sell")
+
+            except ValueError as e:
+                print(f"[!] Error loading market {key_str}: {e}")
