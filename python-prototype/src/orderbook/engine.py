@@ -95,8 +95,11 @@ class MatchingEngine:
                     "name": display_name,
                     "target_user": target_user,
                     "threshold_minutes": minutes,
-                    "best_bid": str(best_bid) if best_bid is not None else None,
-                    "best_ask": str(best_ask) if best_ask is not None else None,
+                    # "best_bid": str(best_bid) if best_bid is not None else None,
+                    # "best_ask": str(best_ask) if best_ask is not None else None,
+                    # To match "volume" and "threshold_minutes" types
+                    "best_bid": best_bid,
+                    "best_ask": best_ask,
                     "volume": 0,  # TODO: track volume
                 }
             )
@@ -147,7 +150,10 @@ class MatchingEngine:
             # Composite key needs to be a string for JSON
             # key is tuple before converting to string
             # key format: "user_id:minutes"
-            markets_data[market_id] = {
+
+            key_str = f"{market_id[0]},{market_id[1]}"  # Convert Tuple Key (user, minutes) -> String "user,minutes"
+
+            markets_data[key_str] = {
                 "name": self._market_names.get(market_id, "Unknown Market"),
                 "bids": serialize_orders(book._bids, "buy"),
                 "asks": serialize_orders(book._asks, "sell"),

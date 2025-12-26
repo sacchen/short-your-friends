@@ -297,6 +297,9 @@ async def handle_client(
 
                     resp = {"status": "ok", "markets": market_list}
 
+                    # Debug: print json we're sending
+                    print(f"DEBUG OUTGOING JSON: {json.dumps(resp)}")
+
                 else:
                     resp = {
                         "status": "error",

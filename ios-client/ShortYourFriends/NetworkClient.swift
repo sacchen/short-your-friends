@@ -126,6 +126,7 @@ class NetworkClient: ObservableObject {
             // Decode Wrapper (GenericResponse), not Array
             if let response = try? JSONDecoder().decode(GenericResponse.self, from: data) {
                 
+                // Success case
                 // If response contains list of markets, update state
                 if let receivedMarkets = response.markets {
                     self.markets = receivedMarkets
@@ -133,9 +134,10 @@ class NetworkClient: ObservableObject {
                     return
                 }
                 
-                // If just status update (eg placing order)
+                // Error or Status case
                 if let status = response.status {
-                    self.log = "Server: \(status)"
+                    let msg = response.message ?? ""
+                    self.log = "Server: \(status) \(msg)"
                     return
                 }
             }
