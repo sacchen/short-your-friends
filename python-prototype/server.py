@@ -413,25 +413,8 @@ def load_world():
             user_id_mapper.load_state(data["mapper"])
 
         if "engine" in data:
-            # Convert string keys "alice,480" back to tuples ("alice", 480)
-            # before giving them to the engine.
-            if "markets" in data["engine"]:
-                tuple_key_markets = {}
-                for k, v in data["engine"]["markets"].items():
-                    # Check if it looks like "string,int"
-                    if isinstance(k, str) and "," in k:
-                        parts = k.split(",")
-                        # Make sure second part is actually a number (minutes)
-                        if len(parts) == 2 and parts[1].isdigit():
-                            real_key = (parts[0], int(parts[1]))  # Convert to Tuple
-                            tuple_key_markets[real_key] = v
-                        else:
-                            tuple_key_markets[k] = v
-                    else:
-                        tuple_key_markets[k] = v
-
-                # Replace string-key dictionary with the tuple-key one
-                data["engine"]["markets"] = tuple_key_markets
+            # We removed converting keys here. Pass raw data to engine.
+            # Engine.load_state now handles the "alice,480" string parsing itself.
 
             engine.load_state(data["engine"])
 
