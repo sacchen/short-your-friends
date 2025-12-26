@@ -358,22 +358,27 @@ async def main() -> None:
 DB_FILE = "state.json"
 
 
-class GameStateEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, Decimal):
-            return str(obj)
-        return super().default(obj)
-
-
 def save_world():
     print("[*] Saving world state...")
 
     # Get raw state
-    data = {
-        "economy": economy.dump_state(),
-        "engine": engine.dump_state(),
-        "mapper": user_id_mapper.dump_state(),
-    }
+    engine_state = engine.dump_state()
+    economy_state = economy.dump_state()
+    mapper_state = user_id_mapper.dump_state()
+
+    # Convert Tuple keys in markets to Strings for JSON
+    # Engine uses keys like ("alice", 60) that JSON can not use
+    if "markets" in engine_state:
+        str_key_markets = {}
+        for k, v in engine_state["markets"].items():
+            if isinstance(k, tuple):
+                key_str = f"{k[0]},{k[1]}"  # Convert ("alice", 60) -> "alice,60"
+                str_key_markets[key_str] = v
+            else:
+                str_key_markets[k] = v
+        engine_state["markets"] = str_key_markets
+
+    data = {"economy": economy_state, "engine": engine_state, "mapper": mapper_state}
 
     # Use custom encoder for Decimals (money)
     # Prevents "Object of type Decimal is not JSON serializable" crash
@@ -403,9 +408,31 @@ def load_world():
 
         if "economy" in data:
             economy.load_state(data["economy"])
+
         if "mapper" in data:
             user_id_mapper.load_state(data["mapper"])
+
         if "engine" in data:
+            # Convert string keys "alice,480" back to tuples ("alice", 480)
+            # before giving them to the engine.
+            if "markets" in data["engine"]:
+                tuple_key_markets = {}
+                for k, v in data["engine"]["markets"].items():
+                    # Check if it looks like "string,int"
+                    if isinstance(k, str) and "," in k:
+                        parts = k.split(",")
+                        # Make sure second part is actually a number (minutes)
+                        if len(parts) == 2 and parts[1].isdigit():
+                            real_key = (parts[0], int(parts[1]))  # Convert to Tuple
+                            tuple_key_markets[real_key] = v
+                        else:
+                            tuple_key_markets[k] = v
+                    else:
+                        tuple_key_markets[k] = v
+
+                # Replace string-key dictionary with the tuple-key one
+                data["engine"]["markets"] = tuple_key_markets
+
             engine.load_state(data["engine"])
 
         print(
