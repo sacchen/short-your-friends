@@ -173,13 +173,18 @@ async def handle_client(
                             # Reconstruct from request or variable we parsed earlier
                             # parsed variable was "market_id" tuple ("alice", 480)
                             # Convert to string for dictionary key
+                            # We need consistent string key for the portfolio dictionary
                             mid_str = f"{market_id[0]},{market_id[1]}"
+
+                            # Convert cents to dollars
+                            # Engine return cents. Economy expects dollars
+                            price_in_dollars = Decimal(trade.price) / 100
 
                             economy.confirm_trade(
                                 buyer_id=buyer_str,
                                 seller_id=seller_str,
                                 market_id=mid_str,
-                                price=Decimal(trade.price),
+                                price=price_in_dollars,
                                 quantity=trade.quantity,
                             )
 
@@ -433,19 +438,38 @@ async def handle_client(
                     }
 
                 elif request["type"] == "get_markets":
-                    # No params. Just list.
-                    market_list = engine.get_active_markets()
+                    # Get raw markets from engine (Uses Int ID: (1, 480))
+                    raw_markets = engine.get_active_markets()
 
-                    resp = {"status": "ok", "markets": market_list}
+                    clean_markets = []
 
-                    # Debug: print json we're sending
-                    # print(f"DEBUG OUTGOING JSON: {json.dumps(resp)}")
+                    for m in raw_markets:
+                        # m is a dict like {"id": "1,480", "name": "..."}
+                        # We need to parse the ID to fix the username
 
-                else:
-                    resp = {
-                        "status": "error",
-                        "message": f"Unknown request type: {request.get('type')}",
-                    }
+                        # Handle tuple or string id
+                        # The engine might return the tuple key directly or a string representation
+                        # Let's handle the string "1,480" which seems to be what you get
+                        try:
+                            internal_id_str, minutes = m["id"].split(",")
+                            internal_id = int(internal_id_str)
+
+                            # CONVERT BACK: Int(1) -> Str("alice")
+                            real_username = user_id_mapper.to_external(internal_id)
+
+                            # Rebuild the ID: "alice,480"
+                            new_id = f"{real_username},{minutes}"
+
+                            # Create a clean copy of the market object
+                            clean_m = m.copy()
+                            clean_m["id"] = new_id
+                            clean_markets.append(clean_m)
+
+                        except Exception:
+                            # Fallback if parsing fails
+                            clean_markets.append(m)
+
+                    resp = {"status": "ok", "markets": clean_markets}
 
                 # Send back
                 writer.write((json.dumps(resp) + "\n").encode())
