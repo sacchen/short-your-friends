@@ -120,7 +120,7 @@ class EconomyManager:
         # so function doesn't run every time server restarts
 
     # save to JSON for Persistence
-    def dump_state(self) -> dict:
+    def dump_state(self) -> Dict[str, Dict[str, str]]:
         """Export all accounts to dictionary."""
         return {
             user_id: {
@@ -131,7 +131,7 @@ class EconomyManager:
             # acc is the Value (`Account` object)
         }
 
-    def load_state(self, data: dict) -> None:
+    def load_state(self, data: Dict[str, Dict[str, str]]) -> None:
         """Restore accounts from dictionary."""
         self.accounts.clear()
         for user_id, balances in data.items():
