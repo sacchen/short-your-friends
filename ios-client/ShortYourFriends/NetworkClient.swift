@@ -21,6 +21,14 @@ struct Market: Identifiable, Codable, Hashable {
     var bestAsk: Double? { return best_ask }
 }
 
+struct Position: Identifiable, Decodable {
+    var id: String { market_id} // conform to Identifiable
+    let market_id: String
+    let side: String // "LONG" or "SHORT"
+    let qty: Int
+    let average_price: Double
+}
+
 struct GenericResponse: Decodable {
     let status: String?
     let message: String?
@@ -31,6 +39,7 @@ struct GenericResponse: Decodable {
     let available: String?
     let locked: String?
     let total_equity: String?
+    let positions: [Position]?
 }
 
 class NetworkClient: ObservableObject {
@@ -41,6 +50,8 @@ class NetworkClient: ObservableObject {
     @Published var markets: [Market] = []
     @Published var log: String = "Ready"
     @Published var balance: String = "0.00"
+
+    @Published var positions: [Position] = []
 
     // Users
     @Published var userId: String = "test_user_1"

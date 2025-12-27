@@ -4,6 +4,7 @@
 //
 //  Created by Samuel Chen on 12/25/25.
 //
+
 import SwiftUI
 
 struct MarketListView: View {
@@ -11,87 +12,123 @@ struct MarketListView: View {
     
     var body: some View {
         NavigationView {
-            VStack {
-                // Connection Status Strip
+            VStack(spacing: 0) {
+                // Wallet Header
+                // This section displays the balance received from the server
                 HStack {
-                    Circle()
-                        .fill(client.isConnected ? Color.green : Color.red)
-                        .frame(width: 10, height: 10)
-                    Text(client.log)
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                    VStack(alignment: .leading) {
+                        Text("Available Cash")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.gray)
+                        
+                        // Displays the balance string from NetworkClient
+                        Text("$\(client.balance)")
+                            .font(.system(size: 34, weight: .bold, design: .rounded))
+                            .foregroundColor(.primary)
+                    }
+                    
                     Spacer()
+                    
+                    // Connection Status
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(client.isConnected ? Color.green : Color.red)
+                            .frame(width: 8, height: 8)
+                        Text(client.isConnected ? "Live" : "Offline")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(8)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(12)
                 }
                 .padding()
-
-                if !client.positions.isEmpty {
-                    Section(header: Text("My Portfolio")) {
-                        ForEach(client.positions) { position in 
-                            HStack {
-                                Text(position.market_id)
-                                Spacer()
-                                Text("\(position.qty) shares")
-                                Text(position.side)
-                                    .foregroundColor(position.side == "LONG" ? .green : .red)
-                                    .font(.caption)
-                                    .padding(4)
-                                    .background(position.side == "LONG" ? Color.green.opacity(0.2) : Color.red.opacity(0.2))
-                                    .cornerRadius(4)
-                            }}
-                    }
-                }
+                .background(Color(UIColor.systemBackground))
                 
-                // Market List
-                List(client.markets) { market in
-                    NavigationLink(destination: MarketDetailView(market: market)
-                        .environmentObject(client)) {
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(market.name)
-                                    .font(.headline)
-                                Text(market.id)
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                            }
-                            
-                            Spacer()
-                            
-                            // Price Display: Spread
-                            VStack(alignment: .trailing) {
-                                if let bid = market.bestBid {
-                                    Text(formatPrice(bid))
-                                        .foregroundColor(.green)
-                                } else {
-                                    Text("No Bids").foregroundColor(.gray)
-                                }
-                                
-                                if let ask = market.bestAsk {
-                                    Text(formatPrice(ask))
-                                        .foregroundColor(.red)
-                                } else {
-                                    Text("No Asks").foregroundColor(.gray)
+                Divider()
+                
+                // Main List
+                List {
+                    // Portfolio Section
+                    // Only shows if you actually own shares
+                    if !client.positions.isEmpty {
+                        Section(header: Text("My Portfolio")) {
+                            ForEach(client.positions) { position in
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text(position.market_id)
+                                            .font(.headline)
+                                        Text(position.side)
+                                            .font(.caption)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(position.side == "LONG" ? .green : .red)
+                                    }
+                                    Spacer()
+                                    Text("\(position.qty) shares")
+                                        .font(.system(.body, design: .monospaced))
                                 }
                             }
-                            .font(.system(.body, design: .monospaced))
+                        }
+                    }
+                    
+                    // Markets Section
+                    Section(header: Text("Active Markets")) {
+                        ForEach(client.markets) { market in
+                            NavigationLink(destination: MarketDetailView(market: market)
+                                .environmentObject(client)) {
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text(market.name)
+                                            .font(.headline)
+                                        Text(market.id)
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    // Price Display: Spread
+                                    VStack(alignment: .trailing) {
+                                        if let bid = market.bestBid {
+                                            Text(formatPrice(bid))
+                                                .foregroundColor(.green)
+                                        } else {
+                                            Text("-").foregroundColor(.gray)
+                                        }
+                                        
+                                        if let ask = market.bestAsk {
+                                            Text(formatPrice(ask))
+                                                .foregroundColor(.red)
+                                        } else {
+                                            Text("-").foregroundColor(.gray)
+                                        }
+                                    }
+                                    .font(.system(.body, design: .monospaced))
+                                }
+                            }
                         }
                     }
                 }
                 .refreshable {
                     // Pull to refresh
-                    client.send(request: ["type": "get_markets"])
+                    client.fetchMarkets()
                 }
             }
-            .navigationTitle("Markets")
-
+            .navigationTitle("Exchange")
+            .navigationBarTitleDisplayMode(.inline)
+            
             // Toolbar Block
             .toolbar {
+                // Mint / Faucet Button
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: {
                         // Send a fake "walk" to generate cash for the CURRENT user
+                        // Mint $10.00 (1000 steps)
                         client.send(request: [
                             "type": "proof_of_walk",
-                            "user_id": client.userId, // Uses the active user
-                            "steps": 1000  // Mints $1.00 (assuming 10 steps = 1 cent)
+                            "user_id": client.userId,
+                            "steps": 1000
                         ])
                         
                         // Refresh balance after a brief delay
@@ -102,15 +139,16 @@ struct MarketListView: View {
                         Image(systemName: "banknote")
                     }
                 }
+                
+                // User Switcher
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
                         // Toggle Logic
                         client.userId = (client.userId == "test_user_1") ? "test_user_2" : "test_user_1"
-
+                        
                         // Fetch new user's balance
                         client.fetchMarkets()
-                    })
-                    {
+                    }) {
                         HStack {
                             Text(client.userId == "test_user_1" ? "User 1" : "User 2")
                                 .font(.caption)
@@ -120,16 +158,11 @@ struct MarketListView: View {
                     }
                 }
             }
-
+            
             .onAppear {
-                // Autoconnect and fetch on load
+                // Autoconnect on load
                 if !client.isConnected {
                     client.connect()
-                }
-                // Give connection a split second, then fetch
-                // TODO: Send automatically on connect in the future
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    client.send(request: ["type": "get_markets"])
                 }
             }
         }
