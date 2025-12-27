@@ -1,5 +1,3 @@
-# Usage: PYTHONPATH=src uv run server.py
-
 import asyncio
 import json
 import os
@@ -176,6 +174,25 @@ async def handle_client(
                                 quantity=trade.quantity,
                             )
 
+                        # Price Improvement: Release unused locked funds
+                        # If buyer got a better price than they locked for, refund the difference
+                        if side == "buy" and len(trades) > 0:
+                            # What they locked at (their order price)
+                            locked_price = price_decimal
+
+                            # What they actually paid (execution price from first trade)
+                            # In multi-trade scenarios, this handles the first fill
+                            actual_price = Decimal(trades[0].price) / 100
+
+                            if actual_price < locked_price:
+                                price_difference = locked_price - actual_price
+                                economy.release_order_lock(
+                                    user_id_str, price_difference, trades[0].quantity
+                                )
+                                print(
+                                    f"[{addr}] Price Improvement: Refunded ${price_difference * trades[0].quantity:.2f}"
+                                )
+
                         print(f"[{addr}] Order Placed. Trades executed: {len(trades)}")
                         resp = {
                             "status": "ok",
@@ -184,7 +201,7 @@ async def handle_client(
                         }
 
                     except ValueError as e:
-                        # If the engine rejects it (eg "Market Closed"), unlock the funds
+                        # If the engine rejects it (e.g. "Market Closed"), unlock the funds
                         if request["side"] == "buy":
                             economy.release_order_lock(
                                 user_id_str,
@@ -332,7 +349,7 @@ async def handle_client(
 
                         # Handle tuple or string id
                         # The engine might return the tuple key directly or a string representation
-                        # Let's handle the string "1,480" which seems to be what we get
+                        # Let's handle the string "1,480" which seems to be what you get
                         try:
                             raw_id = str(m["id"])
                             if "," in raw_id:
@@ -485,6 +502,11 @@ if __name__ == "__main__":
         if not engine._markets:
             print("[+] Seeding Dev Data...")
 
+            # Fund the market maker
+            # Market makers need capital to provide liquidity
+            economy.get_account("market_maker").balance_available = Decimal("1000.00")
+            print("[+] Funded market_maker with $1000.00")
+
             # Define Market ID - Convert string user ID to internal
             alice_internal_id = user_id_mapper.to_internal("alice")
             m_id = (alice_internal_id, 480)
@@ -496,18 +518,23 @@ if __name__ == "__main__":
             mm_id = user_id_mapper.to_internal("market_maker")
 
             # Place Seed Orders (Prices in Cents)
-            # Buy 10 contracts at $0.40
-            # order_id must be int, not string
-            engine.process_order(
-                market_id=m_id,
-                side="buy",
-                price=40,
-                quantity=10,
-                order_id=1,
-                user_id=mm_id,
-            )
+            # These will now properly lock funds through the economy system
+
+            # Buy 10 contracts at $0.40 (costs $4.00)
+            # Lock funds for buy order
+            if economy.attempt_order_lock("market_maker", Decimal("0.40"), 10):
+                engine.process_order(
+                    market_id=m_id,
+                    side="buy",
+                    price=40,
+                    quantity=10,
+                    order_id=1,
+                    user_id=mm_id,
+                )
+                print("[+] Placed market maker buy: 10 @ $0.40")
 
             # Sell 10 contracts at $0.60
+            # Sellers don't lock cash, so just place the order
             engine.process_order(
                 market_id=m_id,
                 side="sell",
@@ -516,6 +543,7 @@ if __name__ == "__main__":
                 order_id=2,
                 user_id=mm_id,
             )
+            print("[+] Placed market maker sell: 10 @ $0.60")
 
             print("[+] Seeding Complete: Added 'Alice Sleep 8:00 AM'")
 
