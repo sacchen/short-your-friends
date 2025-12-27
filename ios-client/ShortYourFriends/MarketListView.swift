@@ -23,6 +23,23 @@ struct MarketListView: View {
                     Spacer()
                 }
                 .padding()
+
+                if !client.positions.isEmpty {
+                    Section(header: Text("My Portfolio")) {
+                        ForEach(client.positions) { position in 
+                            HStack {
+                                Text(position.market_id)
+                                Spacer()
+                                Text("\(position.qty) shares")
+                                Text(position.side)
+                                    .foregroundColor(position.side == "LONG" ? .green : .red)
+                                    .font(.caption)
+                                    .padding(4)
+                                    .background(position.side == "LONG" ? Color.green.opacity(0.2) : Color.red.opacity(0.2))
+                                    .cornerRadius(4)
+                            }}
+                    }
+                }
                 
                 // Market List
                 List(client.markets) { market in
