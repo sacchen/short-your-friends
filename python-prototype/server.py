@@ -87,6 +87,33 @@ async def handle_client(
                         "new_balance": str(new_balance),
                     }
 
+                elif request["type"] == "balance":
+                    # {"type": "balance", "user_id": "alice"}
+                    user_id = request["user_id"]
+                    account = economy.get_account(user_id)
+
+                    # Format Portfolio for Swift Client
+                    positions_list = []
+                    for m_id, qty in account.portfolio.items():
+                        if qty != 0:
+                            positions_list.append(
+                                {
+                                    "market_id": m_id,
+                                    "side": "LONG" if qty > 0 else "SHORT",
+                                    "qty": abs(qty),
+                                    "average_price": 0.0,  # Placeholder
+                                }
+                            )
+
+                    resp = {
+                        "status": "ok",
+                        "user_id": user_id,
+                        "available": str(account.balance_available),
+                        "locked": str(account.balance_locked),
+                        "total_equity": str(account.total_equity()),
+                        "positions": positions_list,
+                    }
+
                 elif request["type"] == "place_order":
                     # Expects: {"type": "place_order", "market_id": "alice_480",
                     #           "user_id": "test_user_1", "side": "buy", "price": 40, "qty": 5}
@@ -141,9 +168,17 @@ async def handle_client(
                         for trade in trades:
                             buyer_str = user_id_mapper.to_external(trade.buy_user_id)
                             seller_str = user_id_mapper.to_external(trade.sell_user_id)
+
+                            # Use market_id string (eg "alice_480" or "alice,480")
+                            # Reconstruct from request or variable we parsed earlier
+                            # parsed variable was "market_id" tuple ("alice", 480)
+                            # Convert to string for dictionary key
+                            mid_str = f"{market_id[0]},{market_id[1]}"
+
                             economy.confirm_trade(
                                 buyer_id=buyer_str,
                                 seller_id=seller_str,
+                                market_id=mid_str,
                                 price=Decimal(trade.price),
                                 quantity=trade.quantity,
                             )
@@ -352,34 +387,48 @@ async def handle_client(
                 elif request["type"] == "settle":
                     # Snitch command: iOS app reports actual screentime
                     settle_req: SettleMarketRequest = request
+                    target_user_id = settle_req["target_user_id"]
+                    actual_screentime_minutes = settle_req["actual_screentime_minutes"]
 
-                    all_trades = engine.settle_markets_for_user(
-                        target_user_id=settle_req["target_user_id"],
-                        actual_screentime_minutes=settle_req[
-                            "actual_screentime_minutes"
-                        ],
-                    )
+                    all_trades = []
+                    markets_settled = 0
 
-                    # Settle: Confirm trades in Economy
-                    for trade in all_trades:
-                        buyer_str = user_id_mapper.to_external(trade.buy_user_id)
-                        seller_str = user_id_mapper.to_external(trade.sell_user_id)
-                        economy.confirm_trade(
-                            buyer_id=buyer_str,
-                            seller_id=seller_str,
-                            price=Decimal(trade.price),
-                            quantity=trade.quantity,
-                        )
+                    # Loop through markets to track which market_id each trade came from
+                    for market_id in list(engine._markets.keys()):
+                        if market_id[0] == target_user_id:  # Same target user
+                            threshold = market_id[1]
+                            terminal_price = (
+                                1 if actual_screentime_minutes >= threshold else 0
+                            )
+                            trades = engine._markets[market_id].settle_market(
+                                terminal_price
+                            )
+
+                            # Convert market_id tuple to string format for economy
+                            mid_str = f"{market_id[0]},{market_id[1]}"
+
+                            # Settle: Confirm trades in Economy with market_id
+                            for trade in trades:
+                                buyer_str = user_id_mapper.to_external(
+                                    trade.buy_user_id
+                                )
+                                seller_str = user_id_mapper.to_external(
+                                    trade.sell_user_id
+                                )
+                                economy.confirm_trade(
+                                    buyer_id=buyer_str,
+                                    seller_id=seller_str,
+                                    market_id=mid_str,
+                                    price=Decimal(trade.price),
+                                    quantity=trade.quantity,
+                                )
+
+                            all_trades.extend(trades)
+                            markets_settled += 1
 
                     resp = {
                         "status": "settled",
-                        "markets_settled": len(
-                            [
-                                m
-                                for m in engine._markets.keys()
-                                if m[0] == settle_req["target_user_id"]
-                            ]
-                        ),
+                        "markets_settled": markets_settled,
                         "total_trades": len(all_trades),
                     }
 
