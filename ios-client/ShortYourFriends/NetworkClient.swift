@@ -135,6 +135,9 @@ class NetworkClient: ObservableObject {
     private func handleMessage(_ jsonString: String) {
         guard let data = jsonString.data(using: .utf8) else { return }
         
+        // Debug: see what Server sends
+        print("[+] Received: \(jsonString)")
+        
         DispatchQueue.main.async {
             do {
                 let response = try JSONDecoder().decode(GenericResponse.self, from: data)
