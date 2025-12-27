@@ -41,6 +41,9 @@ class NetworkClient: ObservableObject {
     @Published var markets: [Market] = []
     @Published var log: String = "Ready"
     @Published var balance: String = "0.00"
+
+    // Users
+    @Published var userId: String = "test_user_1"
     
     // Buffer State
     private var incomingBuffer: String = ""
@@ -150,7 +153,7 @@ class NetworkClient: ObservableObject {
     
     func fetchMarkets() {
         self.send(request: ["type": "get_markets"])
-        self.send(request: ["type": "balance", "user_id": "test_user_1"])
+        self.send(request: ["type": "balance", "user_id": self.userId])
     }
     
     func placeOrder(marketId: String, side: String, price: Double, quantity: Int) {
@@ -158,7 +161,7 @@ class NetworkClient: ObservableObject {
         let payload: [String: Any] = [
             "type": "place_order",
             "market_id": marketId,
-            "user_id": "test_user_1",
+            "user_id": self.userId,
             "side": side,
             "price": priceInCents,
             "qty": quantity,
