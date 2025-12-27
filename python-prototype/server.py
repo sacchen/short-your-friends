@@ -143,6 +143,10 @@ async def handle_client(
                         # Map "test_user_1" -> 2 (Internal Integer ID)
                         user_id_int = user_id_mapper.to_internal(user_id_str)
 
+                        if market_id not in engine._markets:
+                            market_name = f"{target_user} Sleep {int(minutes_str) // 60}:{int(minutes_str) % 60:02d}"
+                            engine.create_market(market_id, market_name)
+
                         trades = engine.process_order(
                             market_id=market_id,
                             side=side,
