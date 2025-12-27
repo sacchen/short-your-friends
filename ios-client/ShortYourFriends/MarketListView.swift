@@ -26,36 +26,37 @@ struct MarketListView: View {
                 
                 // Market List
                 List(client.markets) { market in
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(market.name)
-                                .font(.headline)
-                            Text(market.id)
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
-                        
-                        Spacer()
-                        
-                        // Price Display: Spread
-                        VStack(alignment: .trailing) {
-                            if let bid = market.bestBid {
-                                Text("Bid: \(bid, specifier: "%.2f")")
-                                    .foregroundColor(.green)
-                            }
-                            else {
-                                Text("No Bids").foregroundColor(.gray)
+                    NavigationLink(destination: MarketDetailView(market: market)
+                        .environmentObject(client)) {
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(market.name)
+                                    .font(.headline)
+                                Text(market.id)
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
                             }
                             
-                            if let ask = market.bestAsk {
-                                Text("Ask: \(ask, specifier: "%.2f")")
-                                    .foregroundColor(.red)
+                            Spacer()
+                            
+                            // Price Display: Spread
+                            VStack(alignment: .trailing) {
+                                if let bid = market.bestBid {
+                                    Text(formatPrice(bid))
+                                        .foregroundColor(.green)
+                                } else {
+                                    Text("No Bids").foregroundColor(.gray)
+                                }
+                                
+                                if let ask = market.bestAsk {
+                                    Text(formatPrice(ask))
+                                        .foregroundColor(.red)
+                                } else {
+                                    Text("No Asks").foregroundColor(.gray)
+                                }
                             }
-                            else {
-                                Text("No Asks").foregroundColor(.gray)
-                            }
+                            .font(.system(.body, design: .monospaced))
                         }
-                        .font(.system(.body, design: .monospaced))
                     }
                 }
                 .refreshable {
@@ -77,5 +78,9 @@ struct MarketListView: View {
             }
         }
     }
-}
 
+    func formatPrice(_ cents: Double?) -> String {
+        guard let c = cents else { return "-" }
+        return String(format: "$%.2f", c / 100.0)
+    }
+}

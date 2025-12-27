@@ -16,6 +16,7 @@ struct ShortYourFriendsApp: App {
         WindowGroup {
             // ContentView()
             MarketListView(client: client)
+                .environmentObject(client)
         }
     }
 }
