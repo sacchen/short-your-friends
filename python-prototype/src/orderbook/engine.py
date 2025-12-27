@@ -107,7 +107,7 @@ class MatchingEngine:
 
     # TODO: add get_market_details() that returns graph data/history
 
-    def dump_state(self) -> dict:
+    def dump_state(self) -> Dict[str, Any]:
         """
         Serializes all markets and their order books to JSON.
         Structure:
@@ -118,11 +118,13 @@ class MatchingEngine:
             }
         }
         """
-        markets_data = {}
+        markets_data: Dict[str, Any] = {}
 
         # Helper
-        def serialize_orders(orders_map, side_label):
-            serialized_list = []
+        def serialize_orders(
+            orders_map: Dict[int, Any], side_label: str
+        ) -> list[dict[str, Any]]:
+            serialized_list: list[Dict[str, Any]] = []
 
             # orders_map is {price: OrderNode}
             # We use .values() to get the OrderNodes (not the price keys)
@@ -161,7 +163,7 @@ class MatchingEngine:
 
         return {"markets": markets_data}
 
-    def load_state(self, state):
+    def load_state(self, state: Dict[str, Any]) -> None:
         """
         Restores market state from JSON dictionary.
         """
@@ -184,7 +186,7 @@ class MatchingEngine:
                     continue
 
                 # Reconstruct Tuple ID
-                market_id = (target_user, int(minutes_str))
+                market_id: MarketId = (target_user, int(minutes_str))
 
                 # Read name from JSON, or fallback to default
                 market_name = market_data.get("name", f"{target_user} > {minutes_str}m")
@@ -194,7 +196,9 @@ class MatchingEngine:
                 book = self._markets[market_id]
 
                 # Helper to restore orders
-                def restore_orders(order_list_data, side):
+                def restore_orders(
+                    order_list_data: list[Dict[str, Any]], side: str
+                ) -> None:
                     for o_data in order_list_data:
                         # Pass arguments explicitly. Previously was Node object
                         book.add_order(

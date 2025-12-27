@@ -9,6 +9,8 @@
 # buy 2 contracts at 60 cents
 # echo '{"type": "place_order", "market_id": "alice_480", "user_id": "test_user_1", "side": "buy", "price": 60, "qty": 2, "id": 1002}' | nc localhost 8888
 
+# trade executed, but state did not update
+
 import asyncio
 import json
 import os
@@ -107,6 +109,7 @@ async def handle_client(
                         price_int = int(request["price"])  # Engine uses Int (cents)
                         price_decimal = Decimal(str(request["price"])) / 100
                         qty = int(request["qty"])
+                        order_id_int = int(request.get("id", 0))  # Convert to int
 
                         # Economy Check: Lock funds for Buys
                         if side == "buy":
@@ -130,9 +133,7 @@ async def handle_client(
                             side=side,
                             price=price_int,
                             quantity=qty,
-                            order_id=request.get(
-                                "id", 0
-                            ),  # Client should ideally send an ID, or we gen one
+                            order_id=order_id_int,
                             user_id=user_id_int,
                         )
 
@@ -452,7 +453,7 @@ async def main() -> None:
 DB_FILE = "state.json"
 
 
-def save_world():
+def save_world() -> None:
     print("[*] Saving world state...")
 
     # Get raw state
@@ -477,7 +478,7 @@ def save_world():
     # Use custom encoder for Decimals (money)
     # Prevents "Object of type Decimal is not JSON serializable" crash
     class DecimalEncoder(json.JSONEncoder):
-        def default(self, obj):
+        def default(self, obj: Any) -> Any:
             if isinstance(obj, Decimal):
                 return str(obj)
             return super().default(obj)
@@ -490,7 +491,7 @@ def save_world():
         print(f"[!] SAVE FAILED: {e}")
 
 
-def load_world():
+def load_world() -> None:
     if not os.path.exists(DB_FILE):
         print("[*] No save file found. Starting fresh.")
         return
@@ -531,8 +532,9 @@ if __name__ == "__main__":
         if not engine._markets:
             print("[+] Seeding Dev Data...")
 
-            # Define Market ID
-            m_id = ("alice", 480)
+            # Define Market ID - Convert string user ID to internal
+            alice_internal_id = user_id_mapper.to_internal("alice")
+            m_id = (alice_internal_id, 480)
 
             # Create Market
             engine.create_market(m_id, "Alice Sleep 8:00 AM")
@@ -542,12 +544,13 @@ if __name__ == "__main__":
 
             # Place Seed Orders (Prices in Cents)
             # Buy 10 contracts at $0.40
+            # order_id must be int, not string
             engine.process_order(
                 market_id=m_id,
                 side="buy",
                 price=40,
                 quantity=10,
-                order_id="seed_buy_1",
+                order_id=1,
                 user_id=mm_id,
             )
 
@@ -557,7 +560,7 @@ if __name__ == "__main__":
                 side="sell",
                 price=60,
                 quantity=10,
-                order_id="seed_sell_1",
+                order_id=2,
                 user_id=mm_id,
             )
 
