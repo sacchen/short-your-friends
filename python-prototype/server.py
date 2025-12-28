@@ -42,7 +42,7 @@ class OrderBookServer:
     Each client connection runs in its own task with shared state (engine, economy, mapper).
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.engine = MatchingEngine()
         self.economy = EconomyManager()
         self.user_id_mapper = UserIdMapper()
@@ -104,7 +104,9 @@ class OrderBookServer:
             if DEBUG_MODE:
                 print(f"[-] Client {addr} disconnected.")
 
-    async def process_request(self, request: dict, addr: Any) -> ResponseTypes:
+    async def process_request(
+        self, request: dict[str, Any], addr: Any
+    ) -> ResponseTypes:
         """Route the request type to the appropriate handler logic."""
         req_type = request.get("type")
         if DEBUG_MODE:
@@ -152,7 +154,7 @@ class OrderBookServer:
 
     # --- Request Handlers ---
 
-    def _handle_proof_of_walk(self, req: dict) -> dict:
+    def _handle_proof_of_walk(self, req: dict[str, Any]) -> dict[str, Any]:
         """Economy & Health Endpoint: Process proof of walk for iOS client."""
         user_id = req["user_id"]
         steps = int(req["steps"])
@@ -166,7 +168,7 @@ class OrderBookServer:
             "new_balance": str(new_balance),
         }
 
-    def _handle_balance(self, req: dict) -> dict:
+    def _handle_balance(self, req: dict[str, Any]) -> dict[str, Any]:
         """Return user's balance and portfolio positions."""
         user_id = req["user_id"]
         account = self.economy.get_account(user_id)
@@ -193,7 +195,9 @@ class OrderBookServer:
             "positions": positions_list,
         }
 
-    async def _handle_place_order(self, req: dict, addr: Any) -> dict:
+    async def _handle_place_order(
+        self, req: dict[str, Any], addr: Any
+    ) -> dict[str, Any]:
         """
         Place an order in the matching engine.
 
@@ -300,48 +304,45 @@ class OrderBookServer:
             print(f"[{addr}] Engine Error: {e}")
             return {"status": "error", "message": str(e)}
 
-    def _handle_cancel(self, req: dict) -> dict:
+    def _handle_cancel(self, req: dict[str, Any]) -> dict[str, Any]:
         """
         Cancel an order and release any locked funds.
-
-        TODO: Optimize - currently searches all markets.
-        Need to track market_id with each order for faster lookup.
+        Uses O(1) engine lookup.
         """
         order_id = req["id"]
-        cancelled_order = None
-        cancelled_side = None  # OrderNode doesn't store side, track separately
 
-        # Search all markets for the order
-        # TODO: optimize by storing market_id with order
-        for market_id, book in self.engine._markets.items():
-            if order_id in book._orders:
-                order = book._orders[order_id]
+        # Ask Engine to handle the cancellation.
+        # It returns OrderMetadata (price, side, market_id)
+        meta = self.engine.cancel_order(order_id)
 
-                # Determine side by checking which book it's in
-                if order.price in book._bids:
-                    cancelled_side = "buy"
-                elif order.price in book._asks:
-                    cancelled_side = "sell"
+        if meta:
+            # If it was a "buy" order, we unlock their cash.
+            if meta.side == "buy":
+                # meta.market_id[0] is the target_user's internal ID.
+                # We need the buyer's ID (which wasn't in our new Metadata yet!)
 
-                book.cancel_order(order_id)
-                cancelled_order = order
-                break
+                # NOTE: We need to know WHO placed the order to refund them.
 
-        if cancelled_order:
-            # Refund: Release lock if it was a buy order
-            if cancelled_side == "buy":
-                # Convert internal ID back to string for Economy
-                user_id_str = self.user_id_mapper.to_external(cancelled_order.user_id)
+                user_id_str = self.user_id_mapper.to_external(meta.user_id)
+
+                # Convert cents (Engine) to dollars (Economy)
+                price_decimal = Decimal(meta.price) / 100
+
                 self.economy.release_order_lock(
                     user_id=user_id_str,
-                    price=Decimal(cancelled_order.price) / 100,
-                    quantity=cancelled_order.quantity,
+                    price=price_decimal,
+                    quantity=meta.quantity,
                 )
-            return {"status": "cancelled", "message": "Funds released"}
 
-        return {"status": "error", "message": "Order not found"}
+            return {
+                "status": "cancelled",
+                "message": f"Order {order_id} removed and funds released.",
+            }
 
-    def _handle_read(self, req: dict) -> SnapshotResponse:
+        # If meta is None, the engine couldn't find the order (already filled or never existed).
+        return {"status": "error", "message": "Order not found or already filled."}
+
+    def _handle_read(self, req: dict[str, Any]) -> SnapshotResponse:
         """
         Return order book snapshot.
 
@@ -357,7 +358,7 @@ class OrderBookServer:
 
         return SnapshotResponse(status="ok", bids=snap["bids"], asks=snap["asks"])
 
-    def _handle_settle(self, req: dict) -> dict:
+    def _handle_settle(self, req: dict[str, Any]) -> dict[str, Any]:
         """
         Snitch command: iOS app reports actual screentime.
         Settles all markets for the target user based on actual outcome.
@@ -406,7 +407,7 @@ class OrderBookServer:
             "total_trades": len(all_trades),
         }
 
-    def _handle_get_markets(self) -> dict:
+    def _handle_get_markets(self) -> dict[str, Any]:
         """
         Return list of active markets with proper username conversion.
 

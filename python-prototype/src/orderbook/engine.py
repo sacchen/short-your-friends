@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from .book import OrderBook
 from .trade import Trade
@@ -7,6 +7,15 @@ from .types import PriceLevel
 
 # Market identifier: (target_user_id, threshold_minutes)
 type MarketId = Tuple[int, int]
+
+
+@dataclass
+class OrderMetadata:
+    market_id: MarketId
+    side: str
+    price: int
+    quantity: int
+    user_id: int
 
 
 @dataclass
@@ -18,6 +27,10 @@ class MatchingEngine:
 
     _markets: Dict[MarketId, OrderBook] = field(default_factory=dict)
     _market_names: Dict[MarketId, str] = field(default_factory=dict)
+
+    # Global Registry
+    # OrderID -> OrderMetadata
+    _order_registry: Dict[int, OrderMetadata] = field(default_factory=dict)
 
     def get_or_create_market(self, market_id: MarketId) -> OrderBook:
         if market_id not in self._markets:
@@ -42,7 +55,58 @@ class MatchingEngine:
         user_id: int,
     ) -> list[Trade]:
         book = self.get_or_create_market(market_id)
-        return book.process_order(side, price, quantity, order_id, user_id)
+
+        # Execute matching logic
+        trades = book.process_order(side, price, quantity, order_id, user_id)
+
+        # Sync Registry
+        # Remove any Maker orders that were fully filled
+        for trade in trades:
+            # If the market order is no longer in the book's internal _orders,
+            # it means it was fully consumed. Remove from global registry.
+            if trade.maker_order_id not in book._orders:
+                self._order_registry.pop(trade.maker_order_id, None)
+
+        # Sync Registry
+        # If the new order (taker) didn't fill completely,
+        # it is now a Maker resting on the book. Register its location
+        if order_id in book._orders:
+            resting_order = book._orders[order_id]
+            self._order_registry[order_id] = OrderMetadata(
+                market_id=market_id,
+                side=side,
+                price=price,
+                quantity=resting_order.quantity,
+                user_id=user_id,
+            )
+
+        return trades
+
+    def cancel_order(self, order_id: int) -> Optional[OrderMetadata]:
+        """
+        Locates and cancels an order across any market in O(1) time.
+        """
+        # Map tells us which market the order is in.
+        meta = self._order_registry.get(order_id)
+
+        if not meta:
+            # If not in map, then order was likely filled or cancelled.
+            return None
+
+        # Targeted Deletion
+        # We have "market_id" from metadata
+        # so access specific book from _markets dictionary.
+        book = self._markets.get(meta.market_id)
+
+        if book:
+            # Tell specific book to remove order from
+            # its internal linked lists and internal _orders dict.
+            book.cancel_order(order_id)
+
+        # Cleanup Registry
+        # Remove entry from global map
+        # Return metadata so Server knows price/qty for refunds.
+        return self._order_registry.pop(order_id)
 
     def settle_markets_for_user(
         self,
