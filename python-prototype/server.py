@@ -48,31 +48,31 @@ async def handle_client(
             #                       "price": 100, "qty": 10}
             try:
                 data = await reader.readuntil(b"\n")  # Wait for data (ending in \n)
-            except asyncio.IncompleteReadError:
-                break  # Client closed connection.
-            except (ConnectionResetErro, BrokenPipeError):
-                break  # Bot or scanner disconnected.
-
                 if not data:
                     break
+            except asyncio.IncompleteReadError:
+                break  # Client closed connection.
+            except (ConnectionResetError, BrokenPipeError):
+                break  # Bot or scanner disconnected.
 
-                message = data.decode().strip()
-                if not message:
-                    continue  # Ignore empty lines/pings
+            message = data.decode().strip()
+            if not message:
+                continue  # Ignore empty lines/pings
 
-                # Parse JSON
-                try:
-                    request = json.loads(message)
-                except json.JSONDecodeError:
-                    if DEBUG_MODE:
-                        print(f"[!] Invalid JSON from {addr}: {message[:50]}")
-                    continue
-
+            # Parse JSON
+            try:
+                request = json.loads(message)
+            except json.JSONDecodeError:
                 if DEBUG_MODE:
-                    print(f"[{addr}] Request: {request.get('type')}")
+                    print(f"[!] Invalid JSON from {addr}: {message[:50]}")
+                continue
 
-                resp: ResponseTypes = {"status": "error", "message": "Unknown type"}
+            if DEBUG_MODE:
+                print(f"[{addr}] Request: {request.get('type')}")
 
+            resp: ResponseTypes = {"status": "error", "message": "Unknown type"}
+
+            try:
                 # Ping Handler
                 if request["type"] == "ping":
                     resp = {"type": "pong", "status": "ok"}
@@ -123,6 +123,12 @@ async def handle_client(
                     # Expects: {"type": "place_order", "market_id": "alice_480",
                     #           "user_id": "test_user_1", "side": "buy", "price": 40, "qty": 5}
 
+                    # Define these early for the except block to use if validation fails
+                    user_id_str = str(request["user_id"])
+                    side = request["side"]
+                    price_decimal = Decimal(str(request["price"])) / 100
+                    qty = int(request["qty"])
+
                     try:
                         # Parse Market ID (String "alice_480" -> Tuple ("alice", 480))
                         # Use rsplit to handle usernames that might contain underscores
@@ -139,13 +145,7 @@ async def handle_client(
                         market_id = (target_user_int, int(minutes_str))
 
                         # Extract Order Details
-                        user_id_str = str(request["user_id"])
-                        side = request["side"]
                         price_int = int(request["price"])  # Engine uses Int (cents)
-                        price_decimal = (
-                            Decimal(str(request["price"])) / 100
-                        )  # Economy uses Dollars
-                        qty = int(request["qty"])
                         order_id_int = int(request.get("id", 0))  # Convert to int
 
                         # Economy Check: Lock funds for Buys
@@ -228,22 +228,15 @@ async def handle_client(
 
                     except ValueError as e:
                         # If the engine rejects it (e.g. "Market Closed"), unlock the funds
-                        if request["side"] == "buy":
+                        if side == "buy":
                             economy.release_order_lock(
                                 user_id_str,
-                                Decimal(str(request["price"])) / 100,
-                                int(request["qty"]),
+                                price_decimal,
+                                qty,
                             )
 
                         print(f"[{addr}] Engine Error: {e}")
                         resp = {"status": "error", "message": str(e)}
-
-                    except Exception as e:
-                        print(f"[{addr}] Unexpected Error: {e}")
-                        import traceback
-
-                        traceback.print_exc()
-                        resp = {"status": "error", "message": "Internal server error"}
 
                 elif request["type"] == "cancel":
                     # TODO: Need to know which market this order is in
@@ -375,7 +368,6 @@ async def handle_client(
 
                         # Handle tuple or string id
                         # The engine might return the tuple key directly or a string representation
-                        # Let's handle the string "1,480" which seems to be what you get
                         try:
                             raw_id = str(m["id"])
                             if "," in raw_id:
@@ -409,28 +401,32 @@ async def handle_client(
                 else:
                     resp = {"status": "error", "message": "Unknown type"}
 
-                # Write Response
-                writer.write((json.dumps(resp) + "\n").encode())
-                await writer.drain()
-
             except KeyError as e:
+                # Catches if client sends {"type": "limit"} but not "price"
                 if DEBUG_MODE:
-                    print(f"[!] Unexpected Error with {addr}: {e}")
+                    print(f"[!] Missing field in request from {addr}: {e}")
+                resp = {"status": "error", "message": f"Missing field: {e}"}
+
+            except Exception as e:
+                print(f"[{addr}] Unexpected Logic Error: {e}")
+                if DEBUG_MODE:
                     import traceback
 
                     traceback.print_exc()
-                    # Catches if client sends {"type": "limit"} but not "price"
-                    err = {"status": "error", "message": f"Missing field: {e}"}
-                    writer.write((json.dumps(err) + "\n").encode())
-                    await writer.drain()
+                resp = {"status": "error", "message": "Internal server error"}
+
+            # Write Response
+            writer.write((json.dumps(resp) + "\n").encode())
+            await writer.drain()
 
     except asyncio.IncompleteReadError:
-        print(f"[-] Client {addr} disconnected.")
+        pass  # Normal disconnect
     except Exception as e:
-        print(f"[!] Error: {e}")
-        import traceback
+        print(f"[!] Connection Error with {addr}: {e}")
+        if DEBUG_MODE:
+            import traceback
 
-        traceback.print_exc()
+            traceback.print_exc()
     finally:
         writer.close()
         try:
@@ -443,8 +439,6 @@ async def handle_client(
 
 async def main() -> None:
     # Start server on localhost port 8888
-    # local:
-    # server = await asyncio.start_server(handle_client, "127.0.0.1", 8888)
     # Public interface:
     server = await asyncio.start_server(handle_client, "0.0.0.0", 8888)
 
@@ -453,6 +447,12 @@ async def main() -> None:
 
     async with server:
         await server.serve_forever()
+
+
+async def periodic_save(interval: int = 300):
+    while True:
+        await asyncio.sleep(interval)
+        save_world()
 
 
 # Stop and load JSON when we start.
