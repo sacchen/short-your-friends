@@ -16,9 +16,11 @@ def test_system_stress():
     # Setup: Create a few users with money
     users = ["user_1", "user_2", "user_3"]
     for u in users:
-        economy.deposit(
-            u, Decimal("1000.00")
-        )  # Ensure your economy has a deposit method
+        account = economy.get_account(u)
+        account.balance_available = Decimal("1000.00")
+        # economy.deposit(
+        #     u, Decimal("1000.00")
+        # )
 
     market_id = ("alice", 480)
 

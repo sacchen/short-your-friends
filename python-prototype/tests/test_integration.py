@@ -5,6 +5,7 @@
 # Start test:   uv run pytest tests/test_integration.py
 
 import json
+import os
 import socket
 
 
@@ -27,8 +28,18 @@ def send_request(sock, request_dict):
 
 
 def test_integration():
-    host = "127.0.0.1"
-    port = 8888
+    # host = "127.0.0.1"
+    # host = "REDACTED_IP"
+    # port = 8888
+
+    # Default to localhost for testing, allow override for production testing
+    host = os.getenv("TEST_SERVER_HOST", "127.0.0.1")
+    port = int(os.getenv("TEST_SERVER_PORT", "8888"))
+
+    # Use unique test user to avoid conflicts
+    import uuid
+
+    user = f"test_user_{uuid.uuid4().hex[:8]}"  # Unique per test run
 
     print(f"--- Connecting to {host}:{port} ---")
 

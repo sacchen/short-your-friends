@@ -32,6 +32,11 @@ class EconomyManager:
             self.accounts[user_id] = Account(user_id=user_id)
         return self.accounts[user_id]
 
+    def deposit(self, user_id: str, amount: Decimal) -> None:
+        """Deposit credits to a user's available balance (for testing/admin)."""
+        account = self.get_account(user_id)
+        account.balance_available += amount
+
     # Game Mechanics (Mint/Burn)
 
     def process_proof_of_walk(self, user_id: str, steps: int) -> Decimal:
