@@ -276,19 +276,41 @@ class OrderBookServer:
 
             # Price Improvement: Release unused locked funds
             # If buyer got a better price than they locked for, refund the difference
-            if side == "buy" and len(trades) > 0:
-                locked_price = price_decimal  # What they locked at (their order price)
-                actual_price = Decimal(trades[0].price) / 100  # What they actually paid
+            if side == "buy" and trades:
+                total_actually_paid = Decimal("0.00")
+                total_qty_filled = 0
 
-                if actual_price < locked_price:
-                    price_difference = locked_price - actual_price
+                for trade in trades:
+                    # Engine uses cents, Economy uses dollars
+                    trade_price_dollars = Decimal(trade.price) / 100
+                    trade_qty = trade.quantity
+
+                    total_actually_paid += trade_price_dollars * trade_qty
+                    total_qty_filled += trade_qty
+
+                # Original lock for these specific filled units
+                # price_decimal is the limit price user wanted
+                total_originally_locked = price_decimal * total_qty_filled
+
+                # Refund the difference
+                refund_amount = total_originally_locked - total_actually_paid
+
+                if refund_amount > 0:
                     self.economy.release_order_lock(
-                        user_id_str, price_difference, trades[0].quantity
+                        user_id_str,
+                        # Pass refund as a flat amount by setting qty=1
+                        # or we can refactor release_order_lock to take a total.
+                        # For now, we pass it as a price of the refund and qty of 1.
+                        price=refund_amount,
+                        quantity=1,
                     )
                     if DEBUG_MODE:
                         print(
-                            f"[{addr}] Price Improvement: Refunded ${price_difference * trades[0].quantity:.2f}"
+                            f"[{addr}] Refunded ${refund_amount:.2f} (Total Fill: {total_qty_filled})"
                         )
+
+                        # f"[{addr}] Refunded ${refund_amount: .2f} due to price improvement"
+                        # f"[{addr}] Price Improvement: Refunded ${price_difference * trades[0].quantity:.2f}"
 
             print(f"[{addr}] Order Placed. Trades executed: {len(trades)}")
             return {
@@ -298,7 +320,7 @@ class OrderBookServer:
             }
 
         except ValueError as e:
-            # If the engine rejects it (e.g., "Market Closed"), unlock the funds
+            # If the engine rejects it (eg "Market Closed"), unlock the funds
             if side == "buy":
                 self.economy.release_order_lock(user_id_str, price_decimal, qty)
             print(f"[{addr}] Engine Error: {e}")
