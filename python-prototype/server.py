@@ -211,14 +211,33 @@ class OrderBookServer:
         qty = int(req["qty"])
 
         try:
-            # Parse Market ID (String "alice_480" -> Tuple (internal_id, 480))
-            # Use rsplit to handle usernames that might contain underscores
+            # Parse Market ID - handle dict format from clients
             raw_market_id = req["market_id"]
-            if "_" in raw_market_id:
-                target_user, minutes_str = raw_market_id.rsplit("_", 1)
+
+            # Defensive check: ensure we handle dict format correctly
+            if isinstance(raw_market_id, dict):
+                # Dictionary format: {"target_user_id": "alice", "threshold_minutes": 60}
+                if (
+                    "target_user_id" not in raw_market_id
+                    or "threshold_minutes" not in raw_market_id
+                ):
+                    return {
+                        "status": "error",
+                        "message": "Invalid market_id format: missing target_user_id or threshold_minutes",
+                    }
+                target_user = str(raw_market_id["target_user_id"])
+                minutes_str = str(raw_market_id["threshold_minutes"])
+            elif isinstance(raw_market_id, str):
+                # Legacy string format: "alice_480" or "alice,480" (for backward compatibility)
+                if "_" in raw_market_id:
+                    target_user, minutes_str = raw_market_id.rsplit("_", 1)
+                else:
+                    target_user, minutes_str = raw_market_id.split(",")
             else:
-                # Fallback if we change ID format later
-                target_user, minutes_str = raw_market_id.split(",")
+                return {
+                    "status": "error",
+                    "message": f"Invalid market_id type: {type(raw_market_id)}",
+                }
 
             # FIX: Always convert username to internal ID for engine
             # This prevents duplicate markets (eg "alice" vs "1")
@@ -227,7 +246,16 @@ class OrderBookServer:
 
             # Engine uses prices in cents (integers)
             price_int = int(req["price"])
-            order_id_int = int(req.get("id", 0))
+
+            # Convert order ID: accept str or int, convert to int for engine
+            # Following same pattern as user_id: flexible in API, int in engine
+            order_id_raw = req.get("id", 0)
+            if isinstance(order_id_raw, str):
+                # Hash string IDs to integers (deterministic)
+                # This allows UUIDs/strings in API while engine uses ints
+                order_id_int = abs(hash(order_id_raw)) % (10**9)  # Keep reasonable size
+            else:
+                order_id_int = int(order_id_raw)
 
             # Economy Check: Lock funds for Buy orders
             if side == "buy":
@@ -262,7 +290,7 @@ class OrderBookServer:
                 try:
                     auditor.run_full_audit()
                 except ValueError:
-                    print(f"CRITICAL: System corrupted after order {order_id}!")
+                    print(f"CRITICAL: System corrupted after order {order_id_int}!")
                     # Stop everything. In a real system, you'd halt the engine here.
 
             # Settlement: Confirm any resulting trades in economy

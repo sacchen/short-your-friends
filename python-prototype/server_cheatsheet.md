@@ -298,3 +298,14 @@ journalctl -u exchange -n 5 --no-pager'
 | Check Status | `ssh exchange 'sudo systemctl status exchange'` |
 | Test Connection | `nc -zv REDACTED_IP 8888` |
 | SSH In | `ssh exchange` |
+
+## My notes
+**Local testing**
+Terminal 1: Start your local server
+`server`
+
+Terminal 2: Run all tests
+`uv run pytest`
+
+**Run only the integration test against your remote droplet**
+`TEST_SERVER_HOST=REDACTED_IP uv run pytest tests/test_integration.py`
