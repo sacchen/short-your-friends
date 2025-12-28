@@ -414,7 +414,10 @@ async def handle_client(
 
 async def main() -> None:
     # Start server on localhost port 8888
-    server = await asyncio.start_server(handle_client, "127.0.0.1", 8888)
+    # local:
+    # server = await asyncio.start_server(handle_client, "127.0.0.1", 8888)
+    # actual server:
+    server = await asyncio.start_server(handle_client, "0.0.0.0", 8888)
 
     addrs = ", ".join(str(sock.getsockname()) for sock in server.sockets)
     print(f"[*] Serving on {addrs}")
