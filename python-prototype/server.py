@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import traceback
+import zlib
 from decimal import Decimal
 from typing import Any, Union
 
@@ -253,7 +254,10 @@ class OrderBookServer:
             if isinstance(order_id_raw, str):
                 # Hash string IDs to integers (deterministic)
                 # This allows UUIDs/strings in API while engine uses ints
-                order_id_int = abs(hash(order_id_raw)) % (10**9)  # Keep reasonable size
+                # order_id_int = abs(hash(order_id_raw)) % (10**9)  # Keep reasonable size
+
+                # Use CRC32 for a stable, deterministic integer across restarts
+                order_id_int = zlib.crc32(order_id_raw.encode()) & 0xFFFFFFFF
             else:
                 order_id_int = int(order_id_raw)
 
@@ -370,11 +374,17 @@ class OrderBookServer:
         Cancel an order and release any locked funds.
         Uses O(1) engine lookup.
         """
-        order_id = req["id"]
+        raw_id = req["id"]
+
+        # Stable conversion so string IDs match the engine's integer IDs
+        if isinstance(raw_id, str):
+            order_id_int = zlib.crc32(raw_id.encode()) & 0xFFFFFFFF
+        else:
+            order_id_int = int(raw_id)
 
         # Ask Engine to handle the cancellation.
         # It returns OrderMetadata (price, side, market_id)
-        meta = self.engine.cancel_order(order_id)
+        meta = self.engine.cancel_order(order_id_int)
 
         if meta:
             # If it was a "buy" order, we unlock their cash.
@@ -397,7 +407,7 @@ class OrderBookServer:
 
             return {
                 "status": "cancelled",
-                "message": f"Order {order_id} removed and funds released.",
+                "message": f"Order {raw_id} removed and funds released.",
             }
 
         # If meta is None, the engine couldn't find the order (already filled or never existed).
