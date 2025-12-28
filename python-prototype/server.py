@@ -14,6 +14,9 @@ from orderbook.types import (
     SnapshotResponse,
 )
 
+# Set to False during stress tests to save CPU cycles
+DEBUG_MODE = True
+
 # Union type helper
 ResponseTypes = Union[
     ActionResponse, SnapshotResponse, SettlementResponse, dict[str, Any]
@@ -35,28 +38,47 @@ async def handle_client(
 
     # Get IP address of the person connecting
     addr = writer.get_extra_info("peername")
-    print(f"[+] New connection from {addr}")
+    if DEBUG_MODE:
+        print(f"[+] New connection from {addr}")
 
     try:
         while True:
-            # Wait for data (ending in \n)
-            data = await reader.readuntil(b"\n")
-
             # Parse JSON
             # Expect strings like: {"type": "limit", "side": "buy",
             #                       "price": 100, "qty": 10}
             try:
+                data = await reader.readuntil(b"\n")  # Wait for data (ending in \n)
+            except asyncio.IncompleteReadError:
+                break  # Client closed connection.
+            except (ConnectionResetErro, BrokenPipeError):
+                break  # Bot or scanner disconnected.
+
+                if not data:
+                    break
+
                 message = data.decode().strip()
                 if not message:
+                    continue  # Ignore empty lines/pings
+
+                # Parse JSON
+                try:
+                    request = json.loads(message)
+                except json.JSONDecodeError:
+                    if DEBUG_MODE:
+                        print(f"[!] Invalid JSON from {addr}: {message[:50]}")
                     continue
 
-                request = json.loads(message)
-                print(f"[{addr}] Request: {request}")
+                if DEBUG_MODE:
+                    print(f"[{addr}] Request: {request.get('type')}")
 
-                resp: ResponseTypes
+                resp: ResponseTypes = {"status": "error", "message": "Unknown type"}
+
+                # Ping Handler
+                if request["type"] == "ping":
+                    resp = {"type": "pong", "status": "ok"}
 
                 # Economy & Health Endpoints for Swift Client
-                if request["type"] == "proof_of_walk":
+                elif request["type"] == "proof_of_walk":
                     # {"type:": "proof_of_walk", "user_id": "alice", "steps": 5000}
                     user_id = request["user_id"]
                     steps = int(request["steps"])
@@ -387,18 +409,20 @@ async def handle_client(
                 else:
                     resp = {"status": "error", "message": "Unknown type"}
 
-                # Send back
+                # Write Response
                 writer.write((json.dumps(resp) + "\n").encode())
                 await writer.drain()
 
             except KeyError as e:
-                import traceback
+                if DEBUG_MODE:
+                    print(f"[!] Unexpected Error with {addr}: {e}")
+                    import traceback
 
-                traceback.print_exc()
-                # Catches if client sends {"type": "limit"} but not "price"
-                err = {"status": "error", "message": f"Missing field: {e}"}
-                writer.write((json.dumps(err) + "\n").encode())
-                await writer.drain()
+                    traceback.print_exc()
+                    # Catches if client sends {"type": "limit"} but not "price"
+                    err = {"status": "error", "message": f"Missing field: {e}"}
+                    writer.write((json.dumps(err) + "\n").encode())
+                    await writer.drain()
 
     except asyncio.IncompleteReadError:
         print(f"[-] Client {addr} disconnected.")
@@ -409,14 +433,19 @@ async def handle_client(
         traceback.print_exc()
     finally:
         writer.close()
-        await writer.wait_closed()
+        try:
+            await writer.wait_closed()
+        except:
+            pass
+        if DEBUG_MODE:
+            print(f"[-] Client {addr} disconnected.")
 
 
 async def main() -> None:
     # Start server on localhost port 8888
     # local:
     # server = await asyncio.start_server(handle_client, "127.0.0.1", 8888)
-    # actual server:
+    # Public interface:
     server = await asyncio.start_server(handle_client, "0.0.0.0", 8888)
 
     addrs = ", ".join(str(sock.getsockname()) for sock in server.sockets)
