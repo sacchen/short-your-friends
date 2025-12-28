@@ -254,6 +254,17 @@ class OrderBookServer:
                 user_id=user_id_int,
             )
 
+            if DEBUG_MODE:
+                from orderbook.audit import SystemAuditor
+
+                # Perform a "Spot Audit" after every order
+                auditor = SystemAuditor(self.engine, self.economy)
+                try:
+                    auditor.run_full_audit()
+                except ValueError:
+                    print(f"CRITICAL: System corrupted after order {order_id}!")
+                    # Stop everything. In a real system, you'd halt the engine here.
+
             # Settlement: Confirm any resulting trades in economy
             for trade in trades:
                 buyer_str = self.user_id_mapper.to_external(trade.buy_user_id)
