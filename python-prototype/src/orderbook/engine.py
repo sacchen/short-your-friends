@@ -59,16 +59,26 @@ class MatchingEngine:
         # Execute matching logic
         trades = book.process_order(side, price, quantity, order_id, user_id)
 
-        # Sync Registry
+        # Sync Registry for Makers (Existing orders that got hit)
         # Remove any Maker orders that were fully filled
         for trade in trades:
-            # If the market order is no longer in the book's internal _orders,
-            # it means it was fully consumed. Remove from global registry.
+            # Fully consumed or partially filled?
             if trade.maker_order_id not in book._orders:
+                # Full fill: remove from registry
                 self._order_registry.pop(trade.maker_order_id, None)
+            else:
+                # Partial fill: Update registry with new remaining quantity
+                # Fetch actual node from book's internal storage
+                maker_node = book._orders[trade.maker_order_id]
 
-        # Sync Registry
-        # If the new order (taker) didn't fill completely,
+                if trade.maker_order_id in self._order_registry:
+                    # Update the metadata object in place
+                    self._order_registry[
+                        trade.maker_order_id
+                    ].quantity = maker_node.quantity
+
+        # Sync Registry for Taker (new order you just placed)
+        # If the taker order wasn't fully filled,
         # it is now a Maker resting on the book. Register its location
         if order_id in book._orders:
             resting_order = book._orders[order_id]
