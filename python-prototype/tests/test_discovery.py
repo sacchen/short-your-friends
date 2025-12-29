@@ -24,8 +24,9 @@ def send_request(sock, request_dict):
 
 def test_market_discovery():
     """Test that markets can be created and discovered"""
-    # host = "127.0.0.1"
-    host = "REDACTED_IP"
+    import os
+
+    host = os.getenv("EXCHANGE_IP", "127.0.0.1")
     port = 8888
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

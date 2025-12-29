@@ -59,7 +59,7 @@ class NetworkClient: ObservableObject {
     // Buffer State
     private var incomingBuffer: String = ""
 
-    func connect(host: String = "REDACTED_IP", port: UInt16 = 8888) {
+    func connect(host: String = "127.0.0.1", port: UInt16 = 8888) {
         let hostEndpoint = NWEndpoint.Host(host)
         guard let portEndpoint = NWEndpoint.Port(rawValue: port) else { return }
         

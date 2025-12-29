@@ -9,7 +9,7 @@ help:
 
 # Run everything locally
 test-local:
-	uv run pytest
+	uv run --env-file .env pytest
 
 # Run integration tests against the live Droplet
 test-prod:
@@ -25,7 +25,8 @@ type-check:
 
 # Run the server with corrected PYTHONPATH
 run-server:
-	PYTHONPATH=src uv run server.py
+	uv run --env-file .env server.py
+	# PYTHONPATH=src uv run server.py
 
 # My existing deploy command
 deploy:

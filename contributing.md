@@ -10,7 +10,7 @@
 - Currently refactoring `src/engine` to move into `engine/engine`
 
 ## Workflow
-Run commands from `python-prototype` directory,
+Run commands from `python-prototype` directory.
 `python-prototype/Makefile` for common tasks:
 - `make type-check`: Runs strict Mypy checks.
 - `make bench`: Runs the matching engine benchmark with PyPy.

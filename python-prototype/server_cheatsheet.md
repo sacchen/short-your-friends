@@ -1,7 +1,7 @@
 # Order Book Server Cheatsheet
 
 ## Server Info
-- **IP:** `REDACTED_IP`
+- **IP:** `<YOUR_DROPLET_IP>` # in .env file
 - **User:** `root`
 - **Port:** `8888`
 - **Service Name:** `exchange`
@@ -133,9 +133,9 @@ ssh exchange 'ss -tlnp | grep 8888'
 
 ### Test Connection from Mac
 ```bash
-nc -zv REDACTED_IP 8888
+nc -zv <YOUR_DROPLET_IP> 8888
 # or
-telnet REDACTED_IP 8888
+telnet <YOUR_DROPLET_IP> 8888
 ```
 
 ### Check Firewall Status
@@ -199,7 +199,7 @@ uv run pytest tests/test_discovery.py
 
 ### Test Against Live Server
 ```bash
-# Make sure test_discovery.py has: host = "REDACTED_IP"
+# Make sure test_discovery.py has: host = "<YOUR_DROPLET_IP>"
 uv run pytest tests/test_discovery.py -v
 ```
 
@@ -296,7 +296,7 @@ journalctl -u exchange -n 5 --no-pager'
 | Restart | `ssh exchange 'sudo systemctl restart exchange'` |
 | View Logs | `ssh exchange 'journalctl -u exchange -f'` |
 | Check Status | `ssh exchange 'sudo systemctl status exchange'` |
-| Test Connection | `nc -zv REDACTED_IP 8888` |
+| Test Connection | `nc -zv <YOUR_DROPLET_IP> 8888` |
 | SSH In | `ssh exchange` |
 
 ## My notes
@@ -308,8 +308,4 @@ Terminal 2: Run all tests
 `uv run pytest`
 
 **Run test against your remote droplet**
-<<<<<<< HEAD
-`TEST_SERVER_HOST=REDACTED_IP uv run pytest`
-=======
-`TEST_SERVER_HOST=164.92.116.117 uv run pytest`
->>>>>>> 7fe7fc0 (Add contributing.md and a bit of engine/engine.py imports)
+`TEST_SERVER_HOST=<YOUR_DROPLET_IP> uv run pytest`
