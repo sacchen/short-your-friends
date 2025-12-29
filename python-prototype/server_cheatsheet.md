@@ -308,4 +308,8 @@ Terminal 2: Run all tests
 `uv run pytest`
 
 **Run test against your remote droplet**
+<<<<<<< HEAD
 `TEST_SERVER_HOST=REDACTED_IP uv run pytest`
+=======
+`TEST_SERVER_HOST=164.92.116.117 uv run pytest`
+>>>>>>> 7fe7fc0 (Add contributing.md and a bit of engine/engine.py imports)
