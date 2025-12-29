@@ -307,5 +307,5 @@ Terminal 1: Start your local server
 Terminal 2: Run all tests
 `uv run pytest`
 
-**Run only the integration test against your remote droplet**
-`TEST_SERVER_HOST=REDACTED_IP uv run pytest tests/test_integration.py`
+**Run test against your remote droplet**
+`TEST_SERVER_HOST=REDACTED_IP uv run pytest`

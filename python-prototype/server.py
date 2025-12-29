@@ -1,3 +1,5 @@
+# python -m src.server
+
 import asyncio
 import json
 import os
@@ -6,8 +8,11 @@ import zlib
 from decimal import Decimal
 from typing import Any, Union
 
+from engine.engine import MatchingEngine
+from orderbook.audit import SystemAuditor
+
+# from engine.interface import translate_client_message
 from orderbook.economy import EconomyManager
-from orderbook.engine import MatchingEngine
 from orderbook.id_mapper import UserIdMapper
 from orderbook.types import (
     ActionResponse,
@@ -44,7 +49,9 @@ class OrderBookServer:
     """
 
     def __init__(self) -> None:
-        self.engine = MatchingEngine()
+        self.auditor = SystemAuditor(engine=None)
+        self.engine = MatchingEngine(auditor=auditor)
+        # auditor.engine = engine
         self.economy = EconomyManager()
         self.user_id_mapper = UserIdMapper()
 
