@@ -20,6 +20,10 @@ state.json
 # Hypothesis
 .hypothesis/
 
+# Claude AI local/personal files
+**/.claude/
+python-prototype/CLAUDE.md
+
 # Swift / Xcode
 .DS_Store
 **/.DS_Store

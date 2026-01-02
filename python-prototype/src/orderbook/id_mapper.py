@@ -5,7 +5,7 @@ API/Economy layers use string IDs
 and matching engine uses integer IDs for performance.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 
 class UserIdMapper:
@@ -14,8 +14,8 @@ class UserIdMapper:
     """
 
     def __init__(self) -> None:
-        self._str_to_int: Dict[str, int] = {}
-        self._int_to_str: Dict[int, str] = {}
+        self._str_to_int: dict[str, int] = {}
+        self._int_to_str: dict[int, str] = {}
         self._next_id: int = 1
 
     def to_internal(self, user_id: str) -> int:
@@ -48,11 +48,11 @@ class UserIdMapper:
 
     # Persistence Methods for server.py
 
-    def dump_state(self) -> Dict[str, Any]:
+    def dump_state(self) -> dict[str, Any]:
         """Return state dict for JSON saving."""
         return {"map": self._str_to_int, "next_id": self._next_id}
 
-    def load_state(self, state: Dict[str, Any]) -> None:
+    def load_state(self, state: dict[str, Any]) -> None:
         """Restore state from JSON dict."""
         self._str_to_int = state.get("map", {})
         self._next_id = state.get("next_id", 1)

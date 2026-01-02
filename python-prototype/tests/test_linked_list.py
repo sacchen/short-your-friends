@@ -8,9 +8,7 @@ from orderbook.node import OrderNode
 
 
 def create_order(id: int, qty: int) -> OrderNode:
-    return OrderNode(
-        order_id=id, user_id=0, price=100, quantity=qty, timestamp=time.time()
-    )
+    return OrderNode(order_id=id, user_id=0, price=100, quantity=qty, timestamp=time.time())
 
 
 def test_append_updates_volume() -> None:

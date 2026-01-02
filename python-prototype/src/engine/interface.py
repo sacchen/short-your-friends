@@ -18,7 +18,7 @@ import zlib
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum, auto
-from typing import Any, Optional
+from typing import Any
 
 from orderbook.economy import EconomyManager
 from orderbook.id_mapper import UserIdMapper
@@ -46,19 +46,19 @@ class EngineCommand:
     action: EngineAction
 
     # For PLACE_ORDER
-    market_id: Optional[tuple[int, int]] = None
-    side: Optional[str] = None
-    price: Optional[int] = None  # In cents
-    quantity: Optional[int] = None
-    order_id: Optional[int] = None
-    user_id: Optional[int] = None
+    market_id: tuple[int, int] | None = None
+    side: str | None = None
+    price: int | None = None  # In cents
+    quantity: int | None = None
+    order_id: int | None = None
+    user_id: int | None = None
 
     # For CANCEL_ORDER
     # Uses order_id field above
 
     # For SETTLE_MARKETS
-    target_user_id: Optional[int] = None
-    actual_screentime_minutes: Optional[int] = None
+    target_user_id: int | None = None
+    actual_screentime_minutes: int | None = None
 
     # For GET_SNAPSHOT
     # Uses market_id field above
@@ -78,9 +78,7 @@ class EngineResponse:
 # --- Translation Functions ---
 
 
-def translate_client_message(
-    request: dict[str, Any], user_id_mapper: UserIdMapper
-) -> EngineCommand:
+def translate_client_message(request: dict[str, Any], user_id_mapper: UserIdMapper) -> EngineCommand:
     """
     Converts client JSON request into EngineCommand.
 
@@ -150,9 +148,7 @@ def translate_client_message(
         raise ValueError(f"Unknown request type: {req_type}")
 
 
-def _parse_market_id(
-    raw_market_id: Any, user_id_mapper: UserIdMapper
-) -> tuple[int, int]:
+def _parse_market_id(raw_market_id: Any, user_id_mapper: UserIdMapper) -> tuple[int, int]:
     """
     Parses market_id from various client formats into engine format (int, int).
 
@@ -211,7 +207,7 @@ class EngineInterface:
         engine: Any,  # MatchingEngine
         economy: EconomyManager,
         user_id_mapper: UserIdMapper,
-        auditor: Optional[Any] = None,  # SystemAuditor
+        auditor: Any | None = None,  # SystemAuditor
         debug_mode: bool = True,
     ):
         self.engine = engine
@@ -244,9 +240,7 @@ class EngineInterface:
                 return EngineResponse(success=True, data=snapshot)
 
             else:
-                return EngineResponse(
-                    success=False, message=f"Unknown action: {cmd.action}"
-                )
+                return EngineResponse(success=False, message=f"Unknown action: {cmd.action}")
 
         except Exception as e:
             return EngineResponse(success=False, message=f"Interface error: {e}")
@@ -276,9 +270,7 @@ class EngineInterface:
 
         # Step 1: Lock funds for buy orders
         if cmd.side == "buy":
-            if not self.economy.attempt_order_lock(
-                user_id_str, price_decimal, cmd.quantity
-            ):
+            if not self.economy.attempt_order_lock(user_id_str, price_decimal, cmd.quantity):
                 return EngineResponse(
                     success=False,
                     message=f"Insufficient funds. Need ${price_decimal * cmd.quantity:.2f}",
@@ -304,9 +296,7 @@ class EngineInterface:
         except ValueError as e:
             # Engine rejected (e.g., market closed)
             if cmd.side == "buy":
-                self.economy.release_order_lock(
-                    user_id_str, price_decimal, cmd.quantity
-                )
+                self.economy.release_order_lock(user_id_str, price_decimal, cmd.quantity)
             return EngineResponse(success=False, message=str(e))
 
         # Step 4: Confirm trades in economy
@@ -367,9 +357,7 @@ class EngineInterface:
         meta = self.engine.cancel_order(cmd.order_id)
 
         if not meta:
-            return EngineResponse(
-                success=False, message="Order not found or already filled"
-            )
+            return EngineResponse(success=False, message="Order not found or already filled")
 
         # Release funds if it was a buy order
         # NOTE: We need to know WHO placed the order to refund them.

@@ -73,9 +73,7 @@ class OrderBookFuzzer(RuleBasedStateMachine):
 
         # 1. LOCK FUNDS (Buyers only)
         if side == "buy":
-            success = self.economy.attempt_order_lock(
-                user_id=user, price=Decimal(price), quantity=qty
-            )
+            success = self.economy.attempt_order_lock(user_id=user, price=Decimal(price), quantity=qty)
             if not success:
                 return order_id
 

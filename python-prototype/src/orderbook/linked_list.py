@@ -1,13 +1,13 @@
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Iterator, Optional
 
 from .node import OrderNode
 
 
 @dataclass(slots=True)
 class OrderList:
-    head: Optional[OrderNode] = None  # just one OrderNode, or None
-    tail: Optional[OrderNode] = None
+    head: OrderNode | None = None  # just one OrderNode, or None
+    tail: OrderNode | None = None
     count: int = 0
     total_volume: int = 0
 

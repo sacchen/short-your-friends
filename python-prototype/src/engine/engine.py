@@ -1,12 +1,12 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from orderbook.book import OrderBook
 from orderbook.trade import Trade
 from orderbook.types import PriceLevel
 
 # Market identifier: (target_user_id, threshold_minutes)
-type MarketId = Tuple[int, int]
+type MarketId = tuple[int, int]
 
 
 @dataclass
@@ -25,12 +25,12 @@ class MatchingEngine:
     Each market is an independent OrderBook.
     """
 
-    _markets: Dict[MarketId, OrderBook] = field(default_factory=dict)
-    _market_names: Dict[MarketId, str] = field(default_factory=dict)
+    _markets: dict[MarketId, OrderBook] = field(default_factory=dict)
+    _market_names: dict[MarketId, str] = field(default_factory=dict)
 
     # Global Registry
     # OrderID -> OrderMetadata
-    _order_registry: Dict[int, OrderMetadata] = field(default_factory=dict)
+    _order_registry: dict[int, OrderMetadata] = field(default_factory=dict)
 
     def get_or_create_market(self, market_id: MarketId) -> OrderBook:
         if market_id not in self._markets:
@@ -73,9 +73,7 @@ class MatchingEngine:
 
                 if trade.maker_order_id in self._order_registry:
                     # Update the metadata object in place
-                    self._order_registry[
-                        trade.maker_order_id
-                    ].quantity = maker_node.quantity
+                    self._order_registry[trade.maker_order_id].quantity = maker_node.quantity
 
         # Sync Registry for Taker (new order you just placed)
         # If the taker order wasn't fully filled,
@@ -92,7 +90,7 @@ class MatchingEngine:
 
         return trades
 
-    def cancel_order(self, order_id: int) -> Optional[OrderMetadata]:
+    def cancel_order(self, order_id: int) -> OrderMetadata | None:
         """
         Locates and cancels an order across any market in O(1) time.
         """
@@ -159,9 +157,7 @@ class MatchingEngine:
             target_user, minutes = market_id
 
             # Use stored name or fallback to default string
-            display_name = self._market_names.get(
-                market_id, f"{target_user} > {minutes}m"
-            )
+            display_name = self._market_names.get(market_id, f"{target_user} > {minutes}m")
 
             market_list.append(
                 {
@@ -181,7 +177,7 @@ class MatchingEngine:
 
     # TODO: add get_market_details() that returns graph data/history
 
-    def dump_state(self) -> Dict[str, Any]:
+    def dump_state(self) -> dict[str, Any]:
         """
         Serializes all markets and their order books to JSON.
         Structure:
@@ -192,13 +188,11 @@ class MatchingEngine:
             }
         }
         """
-        markets_data: Dict[str, Any] = {}
+        markets_data: dict[str, Any] = {}
 
         # Helper
-        def serialize_orders(
-            orders_map: Dict[int, Any], side_label: str
-        ) -> list[dict[str, Any]]:
-            serialized_list: list[Dict[str, Any]] = []
+        def serialize_orders(orders_map: dict[int, Any], side_label: str) -> list[dict[str, Any]]:
+            serialized_list: list[dict[str, Any]] = []
 
             # orders_map is {price: OrderNode}
             # We use .values() to get the OrderNodes (not the price keys)
@@ -237,7 +231,7 @@ class MatchingEngine:
 
         return {"markets": markets_data}
 
-    def load_state(self, state: Dict[str, Any]) -> None:
+    def load_state(self, state: dict[str, Any]) -> None:
         """
         Restores market state from JSON dictionary.
         """
@@ -270,9 +264,7 @@ class MatchingEngine:
                 book = self._markets[market_id]
 
                 # Helper to restore orders
-                def restore_orders(
-                    order_list_data: list[Dict[str, Any]], side: str
-                ) -> None:
+                def restore_orders(order_list_data: list[dict[str, Any]], side: str) -> None:
                     for o_data in order_list_data:
                         # Pass arguments explicitly. Previously was Node object
                         book.add_order(

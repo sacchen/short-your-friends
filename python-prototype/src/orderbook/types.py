@@ -39,9 +39,7 @@ class SettlementResponse(TypedDict):
 
 # Sum Type (Tagged Union)
 # Any valid message must be one of these three:
-ClientMessage = Union[
-    LimitOrderRequest, CancelOrderRequest, ReadBookRequest, SettleMarketRequest
-]
+ClientMessage = Union[LimitOrderRequest, CancelOrderRequest, ReadBookRequest, SettleMarketRequest]
 
 
 # Response Objects (Server -> Client)

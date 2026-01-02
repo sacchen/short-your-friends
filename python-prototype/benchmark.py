@@ -53,9 +53,7 @@ def run_benchmark(n_orders: int = 100_000, n_iterations: int = 10) -> None:
         ops = n_orders / duration
         throughputs.append(ops)
 
-        print(
-            f"Iteration {iteration + 1:2d}: {ops:,.0f} orders/sec ({duration:.4f}s, {matches:,} trades)"
-        )
+        print(f"Iteration {iteration + 1:2d}: {ops:,.0f} orders/sec ({duration:.4f}s, {matches:,} trades)")
 
     # Calculate average
     avg_throughput = statistics.mean(throughputs)

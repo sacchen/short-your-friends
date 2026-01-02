@@ -39,9 +39,7 @@ def test_integration() -> None:
         assert resp["available"] == "0.00"
 
         # 2. Mint Money (Proof of Walk)
-        resp = send_request(
-            s, {"type": "proof_of_walk", "user_id": user, "steps": 10000}
-        )
+        resp = send_request(s, {"type": "proof_of_walk", "user_id": user, "steps": 10000})
         assert resp["new_balance"] == "100.00"
 
         # 3. Place Buy Order (Lock Funds)
@@ -63,9 +61,7 @@ def test_integration() -> None:
         if resp.get("status") != "ok":
             print(f"ERROR: {resp.get('message', 'Unknown error')}")
             print(f"Full response: {resp}")
-        assert resp["status"] == "ok", (
-            f"Order failed: {resp.get('message', 'Unknown error')}"
-        )
+        assert resp["status"] == "ok", f"Order failed: {resp.get('message', 'Unknown error')}"
 
         # 4. Check Balance (Should be 50 available, 50 locked)
         resp = send_request(s, {"type": "balance", "user_id": user})

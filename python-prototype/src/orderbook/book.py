@@ -1,7 +1,6 @@
 import heapq
 import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
 
 from .linked_list import OrderList
 from .node import OrderNode
@@ -13,22 +12,22 @@ from .types import PriceLevel
 class OrderBook:
     # Find order
     # Order ID -> OrderNode
-    _orders: Dict[int, OrderNode] = field(default_factory=dict)
+    _orders: dict[int, OrderNode] = field(default_factory=dict)
 
     # Price Levels
     # Price -> OrderList
     # Key=Price, Value=Linked List of orders at that price
-    _bids: Dict[int, OrderList] = field(default_factory=dict)
-    _asks: Dict[int, OrderList] = field(default_factory=dict)
+    _bids: dict[int, OrderList] = field(default_factory=dict)
+    _asks: dict[int, OrderList] = field(default_factory=dict)
 
     # Sorted prices
     # Heaps with lazy deletion
     # _bids_heap stores -price since heapq is a Min-Heap
-    _bids_heap: List[int] = field(default_factory=list)
-    _asks_heap: List[int] = field(default_factory=list)
+    _bids_heap: list[int] = field(default_factory=list)
+    _asks_heap: list[int] = field(default_factory=list)
 
     # Track net positions per user
-    _positions: Dict[int, int] = field(default_factory=dict)  # user_id -> net_qty
+    _positions: dict[int, int] = field(default_factory=dict)  # user_id -> net_qty
 
     # Track if market is open
     active: bool = True
@@ -40,7 +39,7 @@ class OrderBook:
         quantity: int,
         order_id: int,
         user_id: int,
-    ) -> List[Trade]:
+    ) -> list[Trade]:
         """
         Matches the order against the book.
         Remainder of partial matches is added to the book.
@@ -94,12 +93,8 @@ class OrderBook:
                     )
 
                     # Update positions
-                    self._positions[user_id] = (
-                        self._positions.get(user_id, 0) + trade_qty
-                    )
-                    self._positions[maker_order.user_id] = (
-                        self._positions.get(maker_order.user_id, 0) - trade_qty
-                    )
+                    self._positions[user_id] = self._positions.get(user_id, 0) + trade_qty
+                    self._positions[maker_order.user_id] = self._positions.get(maker_order.user_id, 0) - trade_qty
 
                     # Update quantities
                     remaining_qty -= trade_qty
@@ -160,12 +155,8 @@ class OrderBook:
                     )
 
                     # Update positions
-                    self._positions[maker_order.user_id] = (
-                        self._positions.get(maker_order.user_id, 0) + trade_qty
-                    )
-                    self._positions[user_id] = (
-                        self._positions.get(user_id, 0) - trade_qty
-                    )
+                    self._positions[maker_order.user_id] = self._positions.get(maker_order.user_id, 0) + trade_qty
+                    self._positions[user_id] = self._positions.get(user_id, 0) - trade_qty
 
                     remaining_qty -= trade_qty
                     maker_order.quantity -= trade_qty
@@ -185,9 +176,7 @@ class OrderBook:
 
         return trades
 
-    def _add_to_book(
-        self, side: str, price: int, quantity: int, order_id: int, user_id: int
-    ) -> None:
+    def _add_to_book(self, side: str, price: int, quantity: int, order_id: int, user_id: int) -> None:
         """
         Places a resting order in the book
         Doesn't match orders
@@ -228,9 +217,7 @@ class OrderBook:
                 heapq.heappush(self._asks_heap, price)
             self._asks[price].append(order)
 
-    def add_order(
-        self, side: str, price: int, quantity: int, order_id: int, user_id: int
-    ) -> None:
+    def add_order(self, side: str, price: int, quantity: int, order_id: int, user_id: int) -> None:
         """
         Public method to add a resting order to the book without matching.
         For matching orders, use process_order() instead.
@@ -265,7 +252,7 @@ class OrderBook:
         # Remove from global map
         del self._orders[order_id]
 
-    def get_best_bid(self) -> Optional[int]:
+    def get_best_bid(self) -> int | None:
         """
         Returns the highest buy price.
         Lazy clean up ghost prices from the heap.
@@ -282,7 +269,7 @@ class OrderBook:
                 heapq.heappop(self._bids_heap)
         return None
 
-    def get_best_ask(self) -> Optional[int]:
+    def get_best_ask(self) -> int | None:
         """
         Returns the lowest sell price.
         """

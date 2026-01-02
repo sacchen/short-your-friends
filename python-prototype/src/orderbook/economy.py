@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any, Dict
+from typing import Any
 
 STEPS_REWARD_RATE = Decimal("0.01")  # Credits per step
 DOOMSCROLL_TAX_RATE = Decimal("5.00")  # Credits burned per hour
@@ -11,12 +11,10 @@ class Account:
     user_id: str
     # Total equity = available + locked
     balance_available: Decimal = field(default_factory=lambda: Decimal("0.00"))
-    balance_locked: Decimal = field(
-        default_factory=lambda: Decimal("0.00")
-    )  # Money in active buy orders
+    balance_locked: Decimal = field(default_factory=lambda: Decimal("0.00"))  # Money in active buy orders
 
     # Track shares: Key=MarketID (eg "alice,480"), Value=Quantity
-    portfolio: Dict[str, int] = field(default_factory=dict)
+    portfolio: dict[str, int] = field(default_factory=dict)
 
     def total_equity(self) -> Decimal:
         # result: Decimal = self.balance_available + self.balance_locked
@@ -25,7 +23,7 @@ class Account:
 
 class EconomyManager:
     def __init__(self) -> None:
-        self.accounts: Dict[str, Account] = {}
+        self.accounts: dict[str, Account] = {}
 
     def get_account(self, user_id: str) -> Account:
         if user_id not in self.accounts:
@@ -151,7 +149,7 @@ class EconomyManager:
         # so function doesn't run every time server restarts
 
     # save to JSON for Persistence
-    def dump_state(self) -> Dict[str, Dict[str, Any]]:
+    def dump_state(self) -> dict[str, dict[str, Any]]:
         """Export all accounts to dictionary."""
         return {
             user_id: {
@@ -163,7 +161,7 @@ class EconomyManager:
             # acc is the Value (`Account` object)
         }
 
-    def load_state(self, data: Dict[str, Dict[str, Any]]) -> None:
+    def load_state(self, data: dict[str, dict[str, Any]]) -> None:
         """Restore accounts from dictionary."""
         self.accounts.clear()
         for user_id, balances in data.items():

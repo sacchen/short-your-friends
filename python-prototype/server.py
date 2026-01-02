@@ -5,7 +5,7 @@ import json
 import os
 import traceback
 from decimal import Decimal
-from typing import Any, Union
+from typing import Any
 
 from engine.engine import MatchingEngine
 from engine.interface import EngineInterface, translate_client_message
@@ -23,9 +23,7 @@ from orderbook.types import (
 # Set to False during stress tests to save CPU cycles
 DEBUG_MODE = True
 DB_FILE = "state.json"
-ResponseTypes = Union[
-    ActionResponse, SnapshotResponse, SettlementResponse, dict[str, Any]
-]
+ResponseTypes = ActionResponse, SnapshotResponse, SettlementResponse, dict[str, Any]
 
 
 class DecimalEncoder(json.JSONEncoder):
@@ -60,9 +58,7 @@ class OrderBookServer:
             debug_mode=DEBUG_MODE,
         )
 
-    async def handle_client(
-        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
-    ) -> None:
+    async def handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         """
         Runs once for every connection.
         10 concurrent versions if 10 people connect.
@@ -112,14 +108,12 @@ class OrderBookServer:
             writer.close()
             try:
                 await writer.wait_closed()
-            except:
+            except (ConnectionResetError, asyncio.IncompleteReadError, OSError):
                 pass
             if DEBUG_MODE:
                 print(f"[-] Client {addr} disconnected.")
 
-    async def process_request(
-        self, request: dict[str, Any], addr: Any
-    ) -> ResponseTypes:
+    async def process_request(self, request: dict[str, Any], addr: Any) -> ResponseTypes:
         """
         Request Handler.
         1. Translate JSON -> EngineCommand
@@ -312,7 +306,7 @@ class OrderBookServer:
 
         print("[*] Loading world state...")
         try:
-            with open(DB_FILE, "r") as f:
+            with open(DB_FILE) as f:
                 data = json.load(f)
 
             if "economy" in data:
@@ -325,9 +319,7 @@ class OrderBookServer:
                 # Engine.load_state handles "1,60" string parsing internally
                 self.engine.load_state(data["engine"])
 
-            print(
-                f"[*] Loaded {len(self.economy.accounts)} accounts and {len(self.engine._markets)} markets."
-            )
+            print(f"[*] Loaded {len(self.economy.accounts)} accounts and {len(self.engine._markets)} markets.")
 
         except Exception as e:
             print(f"[!] Failed to load save file: {e}")

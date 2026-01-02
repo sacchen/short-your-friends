@@ -39,9 +39,7 @@ async def main() -> None:
         "actual_screentime_minutes": 120,  # [!] 2 hours! (Over the 60m limit)
     }
 
-    print(
-        f"[!] [Oracle] Reporting violation: {payload['actual_screentime_minutes']} minutes used."
-    )
+    print(f"[!] [Oracle] Reporting violation: {payload['actual_screentime_minutes']} minutes used.")
 
     # Send Data (NDJSON)
     message = json.dumps(payload) + "\n"

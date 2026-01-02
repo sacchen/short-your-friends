@@ -60,14 +60,9 @@ class SystemAuditor:
 
             # What the global registry (used for cancellations) thinks is there
             registry_volume = sum(
-                meta.quantity
-                for meta in self.engine._order_registry.values()
-                if meta.market_id == market_id
+                meta.quantity for meta in self.engine._order_registry.values() if meta.market_id == market_id
             )
 
             if book_volume != registry_volume:
-                raise ValueError(
-                    f"Registry mismatch in {market_id}! "
-                    f"Book: {book_volume}, Registry: {registry_volume}"
-                )
+                raise ValueError(f"Registry mismatch in {market_id}! Book: {book_volume}, Registry: {registry_volume}")
         print("[✓] Registry Integrity: Global Map matches Local Books.")

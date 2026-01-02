@@ -4,7 +4,7 @@ import asyncio
 import json
 import random
 import sys
-from typing import Any, Dict, NoReturn, TypedDict, cast
+from typing import Any, NoReturn, TypedDict, cast
 
 # NoReturn for infinite loops: functions never exits
 
@@ -23,7 +23,7 @@ MARKET_ID: MarketIdDict = {"target_user_id": 1, "threshold_minutes": 60}
 
 
 # Network Helpers
-async def send_json(writer: asyncio.StreamWriter, data: Dict[str, Any]) -> None:
+async def send_json(writer: asyncio.StreamWriter, data: dict[str, Any]) -> None:
     """
     Helper to send NDJSON.
     Encodes the string to bytes before writing to socket.
@@ -35,13 +35,13 @@ async def send_json(writer: asyncio.StreamWriter, data: Dict[str, Any]) -> None:
     await writer.drain()
 
 
-async def read_json(reader: asyncio.StreamReader) -> Dict[str, Any]:
+async def read_json(reader: asyncio.StreamReader) -> dict[str, Any]:
     """
     Helper to read one line of JSON response.
     Blocks until a newline (\n) is received.
     """
     data = await reader.readuntil(b"\n")
-    return cast(Dict[str, Any], json.loads(data.decode()))
+    return cast(dict[str, Any], json.loads(data.decode()))
 
 
 # Market Maker
@@ -211,9 +211,7 @@ async def ticker_tape() -> NoReturn:
 
             # Render Header
             print("=== SHORTYOURFRIENDS LOB ===")
-            print(
-                f"Market: User {MARKET_ID['target_user_id']} > {MARKET_ID['threshold_minutes']}m"
-            )
+            print(f"Market: User {MARKET_ID['target_user_id']} > {MARKET_ID['threshold_minutes']}m")
             print(f"Spread: {calculate_spread(bids, asks)}")
             print("-" * 42)
             print(f"{'BID QTY':<10} | {'PRICE':^12} | {'ASK QTY':>10}")
@@ -221,9 +219,7 @@ async def ticker_tape() -> NoReturn:
 
             # Render Header
             print("=== SHORTYOURFRIENDS LOB ===")
-            print(
-                f"Market: User {MARKET_ID['target_user_id']} > {MARKET_ID['threshold_minutes']}m"
-            )
+            print(f"Market: User {MARKET_ID['target_user_id']} > {MARKET_ID['threshold_minutes']}m")
             print(f"Spread: {calculate_spread(bids, asks)}")
             print("-" * 42)
             print(f"{'BID QTY':<10} | {'PRICE':^12} | {'ASK QTY':>10}")
@@ -236,18 +232,17 @@ async def ticker_tape() -> NoReturn:
                 if i < len(bids) and i < len(asks):
                     # Both bid and ask exist at this level
                     print(
-                        f"\033[92m{bids[i]['volume']:<10}\033[0m | \033[93m{bids[i]['price']:>4}\033[0m  \033[93m{asks[i]['price']:<4}\033[0m | \033[91m{asks[i]['volume']:>10}\033[0m"
+                        f"\033[92m{bids[i]['volume']:<10}\033[0m | "
+                        f"\033[92m{bids[i]['price']:>4}\033[0m  "
+                        f"\033[93m{asks[i]['price']:<4}\033[0m | "
+                        f"\033[91m{asks[i]['volume']:>10}\033[0m"
                     )
                 elif i < len(bids):
                     # Only bid exists
-                    print(
-                        f"\033[92m{bids[i]['volume']:<10}\033[0m | \033[92m{bids[i]['price']:^12}\033[0m | {'':>10}"
-                    )
+                    print(f"\033[92m{bids[i]['volume']:<10}\033[0m | \033[92m{bids[i]['price']:^12}\033[0m | {'':>10}")
                 elif i < len(asks):
                     # Only ask exists
-                    print(
-                        f"{'':<10} | \033[91m{asks[i]['price']:^12}\033[0m | \033[91m{asks[i]['volume']:>10}\033[0m"
-                    )
+                    print(f"{'':<10} | \033[91m{asks[i]['price']:^12}\033[0m | \033[91m{asks[i]['volume']:>10}\033[0m")
                 else:
                     # Empty row
                     print(f"{'':<10} | {'':^12} | {'':>10}")
@@ -260,7 +255,7 @@ async def ticker_tape() -> NoReturn:
         sys.exit(0)
 
 
-def calculate_spread(bids: list[Dict[str, Any]], asks: list[Dict[str, Any]]) -> str:
+def calculate_spread(bids: list[dict[str, Any]], asks: list[dict[str, Any]]) -> str:
     if not bids or not asks:
         return "Inf"
     best_bid = bids[0]["price"]

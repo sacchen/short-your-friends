@@ -43,11 +43,38 @@ files = ["src", "server.py", "benchmark.py", "simulation.py", "trigger_settle.py
 # Usage: uv run mypy
 
 [tool.ruff]
-line-length = 88
+# Increased from 88 to 120 to handle f-strings with ANSI color codes
+line-length = 120
 target-version = "py313"
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]  # E/F = standard errors, I = import sorting
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort (import sorting)
+    "UP",  # pyupgrade (modern Python idioms)
+]
+
+# Ignore specific rules if needed
+ignore = [
+    # "E501",  # Uncomment to disable line-length checking entirely (not recommended)
+]
+
+# Allow unused variables when prefixed with underscore
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.isort]
+# Organize imports nicely
+combine-as-imports = true
+known-first-party = ["orderbook", "engine", "economy", "audit"]
+force-wrap-aliases = true
+
+[tool.ruff.format]
+# Formatting preferences
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
 
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
