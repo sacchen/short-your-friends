@@ -14,21 +14,21 @@ Responsibilities:
 - Interface bridges the gap
 """
 
+import zlib
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum, auto
 from typing import Any, Optional
-import zlib
 
 from ..orderbook.economy import EconomyManager
 from ..orderbook.id_mapper import UserIdMapper
-from ..orderbook.trade import Trade
-
 
 # --- Command Types ---
 
+
 class EngineAction(Enum):
     """All possible actions the engine can perform"""
+
     PLACE_ORDER = auto()
     CANCEL_ORDER = auto()
     SETTLE_MARKETS = auto()
@@ -42,6 +42,7 @@ class EngineCommand:
     Unified command structure for engine operations.
     All fields use ENGINE representation (ints, cents, stable IDs).
     """
+
     action: EngineAction
 
     # For PLACE_ORDER
@@ -68,6 +69,7 @@ class EngineResponse:
     """
     Unified response structure from engine operations.
     """
+
     success: bool
     data: Any = None
     message: str = ""
@@ -75,9 +77,9 @@ class EngineResponse:
 
 # --- Translation Functions ---
 
+
 def translate_client_message(
-    request: dict[str, Any],
-    user_id_mapper: UserIdMapper
+    request: dict[str, Any], user_id_mapper: UserIdMapper
 ) -> EngineCommand:
     """
     Converts client JSON request into EngineCommand.
@@ -119,15 +121,12 @@ def translate_client_message(
             price=int(request["price"]),  # Already in cents
             quantity=int(request["qty"]),
             order_id=order_id,
-            user_id=user_id_int
+            user_id=user_id_int,
         )
 
     elif req_type == "cancel":
         order_id = _parse_order_id(request["id"])
-        return EngineCommand(
-            action=EngineAction.CANCEL_ORDER,
-            order_id=order_id
-        )
+        return EngineCommand(action=EngineAction.CANCEL_ORDER, order_id=order_id)
 
     elif req_type == "settle":
         # FIX: Convert string username to internal ID for comparison
@@ -137,7 +136,7 @@ def translate_client_message(
         return EngineCommand(
             action=EngineAction.SETTLE_MARKETS,
             target_user_id=target_user_int,
-            actual_screentime_minutes=int(request["actual_screentime_minutes"])
+            actual_screentime_minutes=int(request["actual_screentime_minutes"]),
         )
 
     elif req_type == "get_markets":
@@ -152,8 +151,7 @@ def translate_client_message(
 
 
 def _parse_market_id(
-    raw_market_id: Any,
-    user_id_mapper: UserIdMapper
+    raw_market_id: Any, user_id_mapper: UserIdMapper
 ) -> tuple[int, int]:
     """
     Parses market_id from various client formats into engine format (int, int).
@@ -197,6 +195,7 @@ def _parse_order_id(raw_id: Any) -> int:
 
 # --- Coordination Layer ---
 
+
 class EngineInterface:
     """
     High-level interface that coordinates engine + economy operations.
@@ -211,7 +210,7 @@ class EngineInterface:
         economy: EconomyManager,
         user_id_mapper: UserIdMapper,
         auditor: Optional[Any] = None,  # SystemAuditor
-        debug_mode: bool = True
+        debug_mode: bool = True,
     ):
         self.engine = engine
         self.economy = economy
@@ -244,15 +243,11 @@ class EngineInterface:
 
             else:
                 return EngineResponse(
-                    success=False,
-                    message=f"Unknown action: {cmd.action}"
+                    success=False, message=f"Unknown action: {cmd.action}"
                 )
 
         except Exception as e:
-            return EngineResponse(
-                success=False,
-                message=f"Interface error: {e}"
-            )
+            return EngineResponse(success=False, message=f"Interface error: {e}")
 
     def _handle_place_order(self, cmd: EngineCommand) -> EngineResponse:
         """
@@ -271,10 +266,12 @@ class EngineInterface:
 
         # Step 1: Lock funds for buy orders
         if cmd.side == "buy":
-            if not self.economy.attempt_order_lock(user_id_str, price_decimal, cmd.quantity):
+            if not self.economy.attempt_order_lock(
+                user_id_str, price_decimal, cmd.quantity
+            ):
                 return EngineResponse(
                     success=False,
-                    message=f"Insufficient funds. Need ${price_decimal * cmd.quantity:.2f}"
+                    message=f"Insufficient funds. Need ${price_decimal * cmd.quantity:.2f}",
                 )
 
         # Step 2: Create market if needed
@@ -292,12 +289,14 @@ class EngineInterface:
                 price=cmd.price,
                 quantity=cmd.quantity,
                 order_id=cmd.order_id,
-                user_id=cmd.user_id
+                user_id=cmd.user_id,
             )
         except ValueError as e:
             # Engine rejected (e.g., market closed)
             if cmd.side == "buy":
-                self.economy.release_order_lock(user_id_str, price_decimal, cmd.quantity)
+                self.economy.release_order_lock(
+                    user_id_str, price_decimal, cmd.quantity
+                )
             return EngineResponse(success=False, message=str(e))
 
         # Step 4: Confirm trades in economy
@@ -317,7 +316,7 @@ class EngineInterface:
                 seller_id=seller_str,
                 market_id=market_id_str,
                 price=trade_price_dollars,
-                quantity=trade.quantity
+                quantity=trade.quantity,
             )
 
         # Step 5: Price Improvement: Release unused locked funds
@@ -339,15 +338,12 @@ class EngineInterface:
                 self.auditor.run_full_audit()
             except ValueError as e:
                 print(f"CRITICAL: Audit failed after order {cmd.order_id}!")
-                return EngineResponse(
-                    success=False,
-                    message=f"Audit failure: {e}"
-                )
+                return EngineResponse(success=False, message=f"Audit failure: {e}")
 
         return EngineResponse(
             success=True,
             data={"trades": trades, "num_trades": len(trades)},
-            message=f"Order placed. {len(trades)} trades executed."
+            message=f"Order placed. {len(trades)} trades executed.",
         )
 
     def _handle_cancel_order(self, cmd: EngineCommand) -> EngineResponse:
@@ -359,8 +355,7 @@ class EngineInterface:
 
         if not meta:
             return EngineResponse(
-                success=False,
-                message="Order not found or already filled"
+                success=False, message="Order not found or already filled"
             )
 
         # Release funds if it was a buy order
@@ -374,7 +369,7 @@ class EngineInterface:
         return EngineResponse(
             success=True,
             data={"order_id": cmd.order_id},
-            message="Order cancelled and funds released"
+            message="Order cancelled and funds released",
         )
 
     def _handle_settle(self, cmd: EngineCommand) -> EngineResponse:
@@ -408,7 +403,7 @@ class EngineInterface:
                         seller_id=seller_str,
                         market_id=market_id_str,
                         price=Decimal(trade.price) / 100,
-                        quantity=trade.quantity
+                        quantity=trade.quantity,
                     )
 
                 all_trades.extend(trades)
@@ -416,11 +411,8 @@ class EngineInterface:
 
         return EngineResponse(
             success=True,
-            data={
-                "markets_settled": markets_settled,
-                "total_trades": len(all_trades)
-            },
-            message=f"Settled {markets_settled} markets with {len(all_trades)} trades"
+            data={"markets_settled": markets_settled, "total_trades": len(all_trades)},
+            message=f"Settled {markets_settled} markets with {len(all_trades)} trades",
         )
 
     def _handle_get_markets(self) -> list[dict[str, Any]]:

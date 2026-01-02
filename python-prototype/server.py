@@ -4,12 +4,11 @@ import asyncio
 import json
 import os
 import traceback
-import zlib
 from decimal import Decimal
 from typing import Any, Union
 
 from engine.engine import MatchingEngine
-from engine.interface import translate_client_message
+from engine.interface import EngineInterface, translate_client_message
 from orderbook.audit import SystemAuditor
 from orderbook.economy import EconomyManager
 from orderbook.id_mapper import UserIdMapper
@@ -43,8 +42,8 @@ class DecimalEncoder(json.JSONEncoder):
 
 class OrderBookServer:
     """
-    Asyncio-based order book server handling multiple concurrent connections.
-    Each client connection runs in its own task with shared state (engine, economy, mapper).
+    Asyncio-based order book server.
+    Delegates logic to EngineInterface.
     """
 
     def __init__(self) -> None:
@@ -53,6 +52,14 @@ class OrderBookServer:
         self.auditor.engine = self.engine
         self.economy = EconomyManager()
         self.user_id_mapper = UserIdMapper()
+
+        self.interface = EngineInterface(
+            engine=self.engine,
+            economy=self.economy,
+            auditor=self.auditor,
+            user_id_mapper=self.user_id_mapper,
+            debug_mode=DEBUG_MODE,
+        )
 
     async def handle_client(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -114,60 +121,56 @@ class OrderBookServer:
     async def process_request(
         self, request: dict[str, Any], addr: Any
     ) -> ResponseTypes:
-        """Route the request type to the appropriate handler logic."""
-        req_type = request.get("type")
-        if DEBUG_MODE:
-            print(f"[{addr}] Request: {req_type}")
-
-        # Convert JSON to EngineCommand
+        """
+        Request Handler.
+        1. Translate JSON -> EngineCommand
+        2. Executes via Interface
+        3. Formats response for TCP
+        """
         try:
-            command = translate_client_message(request)
+            # Convert JSON to EngineCommand
+            command = translate_client_message(request, self.user_id_mapper)
+
+            # Execute: Interface handles logic/locking/matching
+            # Returns EngineResponse object (success, data, message)
+            resp_obj = self.interface.execute(command)
+
+            # Convert EngineRespones object back to a Dictionary for JSON
+            response = {
+                "status": "ok" if resp_obj.success else "error",
+                "message": resp_obj.message,
+            }
+
+            # If Interface returned data, merge it in
+            if resp_obj.data:
+                # If data is a list (eg markets), wrap it
+                if isinstance(resp_obj.data, list):
+                    # Guessing key based on command, or just put it in "data"
+                    # TODO: Let Interface return dicts, or wrap here
+                    # Currently assumes get_marketes returns a list
+                    if request.get("type") == "get_markets":
+                        response["markets"] = resp_obj.data
+                    else:
+                        response["data"] = resp_obj.data
+                elif isinstance(resp_obj.data, dict):
+                    response.update(resp_obj.data)
+
+            return response
+
         except ValueError:
-            return {"status": "error", "message": "Malformed request"}
+            # If translate_client_message fails,
+            # try legacy/info command.
+            req_type = request.get("type")
 
-        # Execute: Hand command to engine
-        # Engine handles Economy, Auditing, and Matching
-        response = self.engine.execute(command, economy=self.economy)
-
-        # Response: Return result
-        if not response.success:
-            return {"status": "error", "message": response.message}
-
-        return {"status": "ok", "data": response.data}
-
-        try:
-            match req_type:
-                case "ping":
-                    return {"type": "pong", "status": "ok"}
-
-                case "proof_of_walk":
-                    return self._handle_proof_of_walk(request)
-
-                case "balance":
-                    return self._handle_balance(request)
-
-                case "place_order":
-                    return await self._handle_place_order(request, addr)
-
-                case "cancel":
-                    return self._handle_cancel(request)
-
-                case "read":
-                    return self._handle_read(request)
-
-                case "settle":
-                    return self._handle_settle(request)
-
-                case "get_markets":
-                    return self._handle_get_markets()
-
-                case _:
-                    return {"status": "error", "message": "Unknown type"}
-
-        except KeyError as e:
-            if DEBUG_MODE:
-                print(f"[!] Missing field in request from {addr}: {e}")
-            return {"status": "error", "message": f"Missing field: {e}"}
+            if req_type == "balance":
+                return self._handle_balance(request)
+            elif req_type == "proof_of_walk":
+                return self._handle_proof_of_walk(request)
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Unknown or malformed command: {req_type}",
+                }
 
         except Exception as e:
             print(f"[{addr}] Unexpected Logic Error: {e}")
@@ -175,7 +178,7 @@ class OrderBookServer:
                 traceback.print_exc()
             return {"status": "error", "message": "Internal server error"}
 
-    # --- Request Handlers ---
+    # --- Legacy / Info Handlers (Not yet in Interface) ---
 
     def _handle_proof_of_walk(self, req: dict[str, Any]) -> dict[str, Any]:
         """Economy & Health Endpoint: Process proof of walk for iOS client."""
@@ -218,319 +221,53 @@ class OrderBookServer:
             "positions": positions_list,
         }
 
-    async def _handle_place_order(
-        self, req: dict[str, Any], addr: Any
-    ) -> dict[str, Any]:
-        """
-        Place an order in the matching engine.
+    # def _handle_read(self, req: dict[str, Any]) -> SnapshotResponse:
+    #     """
+    #     Return order book snapshot.
 
-        Market ID Format: "alice_480" or "alice,480" -> (internal_id, 480)
-        FIX: Always convert username to internal ID for engine to prevent
-        duplicate markets (e.g., "alice" vs internal ID "1").
-        """
-        user_id_str = str(req["user_id"])
-        side = req["side"]
-        price_decimal = Decimal(str(req["price"])) / 100
-        qty = int(req["qty"])
+    #     TODO: Need market_id in ReadBookRequest.
+    #     Currently returns first market as fallback.
+    #     """
+    #     if not self.engine._markets:
+    #         return SnapshotResponse(status="ok", bids=[], asks=[])
 
-        try:
-            # Parse Market ID - handle dict format from clients
-            raw_market_id = req["market_id"]
+    #     # Get first market (will want to specify market_id later)
+    #     first_market_id = next(iter(self.engine._markets.keys()))
+    #     snap = self.engine.get_market_snapshot(first_market_id)
 
-            # Defensive check: ensure we handle dict format correctly
-            if isinstance(raw_market_id, dict):
-                # Dictionary format: {"target_user_id": "alice", "threshold_minutes": 60}
-                if (
-                    "target_user_id" not in raw_market_id
-                    or "threshold_minutes" not in raw_market_id
-                ):
-                    return {
-                        "status": "error",
-                        "message": "Invalid market_id format: missing target_user_id or threshold_minutes",
-                    }
-                target_user = str(raw_market_id["target_user_id"])
-                minutes_str = str(raw_market_id["threshold_minutes"])
-            elif isinstance(raw_market_id, str):
-                # Legacy string format: "alice_480" or "alice,480" (for backward compatibility)
-                if "_" in raw_market_id:
-                    target_user, minutes_str = raw_market_id.rsplit("_", 1)
-                else:
-                    target_user, minutes_str = raw_market_id.split(",")
-            else:
-                return {
-                    "status": "error",
-                    "message": f"Invalid market_id type: {type(raw_market_id)}",
-                }
+    #     return SnapshotResponse(status="ok", bids=snap["bids"], asks=snap["asks"])
 
-            # FIX: Always convert username to internal ID for engine
-            # This prevents duplicate markets (eg "alice" vs "1")
-            target_user_int = self.user_id_mapper.to_internal(target_user)
-            market_id = (target_user_int, int(minutes_str))
+    # def _handle_get_markets(self) -> dict[str, Any]:
+    #     """
+    #     Return list of active markets with proper username conversion.
 
-            # Engine uses prices in cents (integers)
-            price_int = int(req["price"])
+    #     Converts internal ID (1) back to username string ("alice") for client display.
+    #     """
+    #     raw_markets = self.engine.get_active_markets()
+    #     clean_markets = []
 
-            # Convert order ID: accept str or int, convert to int for engine
-            # Following same pattern as user_id: flexible in API, int in engine
-            order_id_raw = req.get("id", 0)
-            if isinstance(order_id_raw, str):
-                # Hash string IDs to integers (deterministic)
-                # This allows UUIDs/strings in API while engine uses ints
-                # order_id_int = abs(hash(order_id_raw)) % (10**9)  # Keep reasonable size
+    #     for m in raw_markets:
+    #         try:
+    #             # Parse the market ID to extract internal ID and convert back to username
+    #             raw_id = str(m["id"])
 
-                # Use CRC32 for a stable, deterministic integer across restarts
-                order_id_int = zlib.crc32(order_id_raw.encode()) & 0xFFFFFFFF
-            else:
-                order_id_int = int(order_id_raw)
+    #             # Handle both "," and "_" separators
+    #             sep = "," if "," in raw_id else "_"
+    #             internal_id_str, minutes = raw_id.split(sep, 1)
 
-            # Economy Check: Lock funds for Buy orders
-            if side == "buy":
-                if not self.economy.attempt_order_lock(user_id_str, price_decimal, qty):
-                    error_msg = f"Insufficient funds. Need ${price_decimal * qty:.2f}"
-                    print(f"[{addr}] Order Rejected: {error_msg}")
-                    return {"status": "error", "message": error_msg}
+    #             # CONVERT BACK: Int(1) -> Str("alice")
+    #             real_username = self.user_id_mapper.to_external(int(internal_id_str))
 
-            # Map string username to internal integer ID
-            user_id_int = self.user_id_mapper.to_internal(user_id_str)
+    #             # Rebuild the ID with real username
+    #             clean_m = m.copy()
+    #             clean_m["id"] = f"{real_username},{minutes}"
+    #             clean_markets.append(clean_m)
 
-            # Create market if it doesn't exist
-            if market_id not in self.engine._markets:
-                market_name = f"{target_user} Sleep {int(minutes_str) // 60}:{int(minutes_str) % 60:02d}"
-                self.engine.create_market(market_id, market_name)
+    #         except Exception:
+    #             # Fallback if parsing fails
+    #             clean_markets.append(m)
 
-            # Execute order in matching engine
-            trades = self.engine.process_order(
-                market_id=market_id,
-                side=side,
-                price=price_int,
-                quantity=qty,
-                order_id=order_id_int,
-                user_id=user_id_int,
-            )
-
-            if DEBUG_MODE:
-                from orderbook.audit import SystemAuditor
-
-                # Perform a "Spot Audit" after every order
-                auditor = SystemAuditor(self.engine, self.economy)
-                try:
-                    auditor.run_full_audit()
-                except ValueError:
-                    print(f"CRITICAL: System corrupted after order {order_id_int}!")
-                    # Stop everything. In a real system, you'd halt the engine here.
-
-            # Settlement: Confirm any resulting trades in economy
-            for trade in trades:
-                buyer_str = self.user_id_mapper.to_external(trade.buy_user_id)
-                seller_str = self.user_id_mapper.to_external(trade.sell_user_id)
-
-                # FIX: Use original username string, not internal ID
-                # We need consistent string key for the portfolio dictionary
-                mid_str = f"{target_user},{int(minutes_str)}"
-
-                # Convert cents to dollars (Engine uses cents, Economy uses dollars)
-                price_in_dollars = Decimal(trade.price) / 100
-
-                self.economy.confirm_trade(
-                    buyer_id=buyer_str,
-                    seller_id=seller_str,
-                    market_id=mid_str,
-                    price=price_in_dollars,
-                    quantity=trade.quantity,
-                )
-
-            # Price Improvement: Release unused locked funds
-            # If buyer got a better price than they locked for, refund the difference
-            if side == "buy" and trades:
-                total_actually_paid = Decimal("0.00")
-                total_qty_filled = 0
-
-                for trade in trades:
-                    # Engine uses cents, Economy uses dollars
-                    trade_price_dollars = Decimal(trade.price) / 100
-                    trade_qty = trade.quantity
-
-                    total_actually_paid += trade_price_dollars * trade_qty
-                    total_qty_filled += trade_qty
-
-                # Original lock for these specific filled units
-                # price_decimal is the limit price user wanted
-                total_originally_locked = price_decimal * total_qty_filled
-
-                # Refund the difference
-                refund_amount = total_originally_locked - total_actually_paid
-
-                if refund_amount > 0:
-                    self.economy.release_order_lock(
-                        user_id_str,
-                        # Pass refund as a flat amount by setting qty=1
-                        # or we can refactor release_order_lock to take a total.
-                        # For now, we pass it as a price of the refund and qty of 1.
-                        price=refund_amount,
-                        quantity=1,
-                    )
-                    if DEBUG_MODE:
-                        print(
-                            f"[{addr}] Refunded ${refund_amount:.2f} (Total Fill: {total_qty_filled})"
-                        )
-
-                        # f"[{addr}] Refunded ${refund_amount: .2f} due to price improvement"
-                        # f"[{addr}] Price Improvement: Refunded ${price_difference * trades[0].quantity:.2f}"
-
-            print(f"[{addr}] Order Placed. Trades executed: {len(trades)}")
-            return {
-                "status": "ok",
-                "message": "Order placed successfully",
-                "trades": len(trades),
-            }
-
-        except ValueError as e:
-            # If the engine rejects it (eg "Market Closed"), unlock the funds
-            if side == "buy":
-                self.economy.release_order_lock(user_id_str, price_decimal, qty)
-            print(f"[{addr}] Engine Error: {e}")
-            return {"status": "error", "message": str(e)}
-
-    def _handle_cancel(self, req: dict[str, Any]) -> dict[str, Any]:
-        """
-        Cancel an order and release any locked funds.
-        Uses O(1) engine lookup.
-        """
-        raw_id = req["id"]
-
-        # Stable conversion so string IDs match the engine's integer IDs
-        if isinstance(raw_id, str):
-            order_id_int = zlib.crc32(raw_id.encode()) & 0xFFFFFFFF
-        else:
-            order_id_int = int(raw_id)
-
-        # Ask Engine to handle the cancellation.
-        # It returns OrderMetadata (price, side, market_id)
-        meta = self.engine.cancel_order(order_id_int)
-
-        if meta:
-            # If it was a "buy" order, we unlock their cash.
-            if meta.side == "buy":
-                # meta.market_id[0] is the target_user's internal ID.
-                # We need the buyer's ID (which wasn't in our new Metadata yet!)
-
-                # NOTE: We need to know WHO placed the order to refund them.
-
-                user_id_str = self.user_id_mapper.to_external(meta.user_id)
-
-                # Convert cents (Engine) to dollars (Economy)
-                price_decimal = Decimal(meta.price) / 100
-
-                self.economy.release_order_lock(
-                    user_id=user_id_str,
-                    price=price_decimal,
-                    quantity=meta.quantity,
-                )
-
-            return {
-                "status": "cancelled",
-                "message": f"Order {raw_id} removed and funds released.",
-            }
-
-        # If meta is None, the engine couldn't find the order (already filled or never existed).
-        return {"status": "error", "message": "Order not found or already filled."}
-
-    def _handle_read(self, req: dict[str, Any]) -> SnapshotResponse:
-        """
-        Return order book snapshot.
-
-        TODO: Need market_id in ReadBookRequest.
-        Currently returns first market as fallback.
-        """
-        if not self.engine._markets:
-            return SnapshotResponse(status="ok", bids=[], asks=[])
-
-        # Get first market (will want to specify market_id later)
-        first_market_id = next(iter(self.engine._markets.keys()))
-        snap = self.engine.get_market_snapshot(first_market_id)
-
-        return SnapshotResponse(status="ok", bids=snap["bids"], asks=snap["asks"])
-
-    def _handle_settle(self, req: dict[str, Any]) -> dict[str, Any]:
-        """
-        Snitch command: iOS app reports actual screentime.
-        Settles all markets for the target user based on actual outcome.
-        """
-        target_user_id = req["target_user_id"]
-        actual_screentime_minutes = req["actual_screentime_minutes"]
-
-        # FIX: Convert string username to internal ID for comparison
-        target_user_int = self.user_id_mapper.to_internal(target_user_id)
-
-        all_trades = []
-        markets_settled = 0
-
-        # Loop through markets to find those belonging to target user
-        for market_id in list(self.engine._markets.keys()):
-            if market_id[0] == target_user_int:  # Compare internal IDs
-                threshold = market_id[1]
-                # Terminal price: 1 if they met/exceeded threshold, 0 if not
-                terminal_price = 1 if actual_screentime_minutes >= threshold else 0
-
-                trades = self.engine._markets[market_id].settle_market(terminal_price)
-
-                # FIX: Convert internal ID back to username string for economy
-                target_user_str = self.user_id_mapper.to_external(market_id[0])
-                mid_str = f"{target_user_str},{market_id[1]}"
-
-                # Settle: Confirm trades in Economy with market_id
-                for trade in trades:
-                    buyer_str = self.user_id_mapper.to_external(trade.buy_user_id)
-                    seller_str = self.user_id_mapper.to_external(trade.sell_user_id)
-
-                    self.economy.confirm_trade(
-                        buyer_id=buyer_str,
-                        seller_id=seller_str,
-                        market_id=mid_str,
-                        price=Decimal(trade.price) / 100,
-                        quantity=trade.quantity,
-                    )
-
-                all_trades.extend(trades)
-                markets_settled += 1
-
-        return {
-            "status": "settled",
-            "markets_settled": markets_settled,
-            "total_trades": len(all_trades),
-        }
-
-    def _handle_get_markets(self) -> dict[str, Any]:
-        """
-        Return list of active markets with proper username conversion.
-
-        Converts internal ID (1) back to username string ("alice") for client display.
-        """
-        raw_markets = self.engine.get_active_markets()
-        clean_markets = []
-
-        for m in raw_markets:
-            try:
-                # Parse the market ID to extract internal ID and convert back to username
-                raw_id = str(m["id"])
-
-                # Handle both "," and "_" separators
-                sep = "," if "," in raw_id else "_"
-                internal_id_str, minutes = raw_id.split(sep, 1)
-
-                # CONVERT BACK: Int(1) -> Str("alice")
-                real_username = self.user_id_mapper.to_external(int(internal_id_str))
-
-                # Rebuild the ID with real username
-                clean_m = m.copy()
-                clean_m["id"] = f"{real_username},{minutes}"
-                clean_markets.append(clean_m)
-
-            except Exception:
-                # Fallback if parsing fails
-                clean_markets.append(m)
-
-        return {"status": "ok", "markets": clean_markets}
+    #     return {"status": "ok", "markets": clean_markets}
 
     # --- Persistence ---
 
@@ -608,6 +345,7 @@ class OrderBookServer:
         self.economy.get_account("market_maker").balance_available = Decimal("1000.00")
         print("[+] Funded market_maker with $1000.00")
 
+        # We could also use Interface to seed data.
         # Define Market ID - Convert string user ID to internal
         alice_internal_id = self.user_id_mapper.to_internal("alice")
         mm_id = self.user_id_mapper.to_internal("market_maker")
