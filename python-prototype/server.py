@@ -9,9 +9,8 @@ from decimal import Decimal
 from typing import Any, Union
 
 from engine.engine import MatchingEngine
+from engine.interface import translate_client_message
 from orderbook.audit import SystemAuditor
-
-# from engine.interface import translate_client_message
 from orderbook.economy import EconomyManager
 from orderbook.id_mapper import UserIdMapper
 from orderbook.types import (
@@ -50,8 +49,8 @@ class OrderBookServer:
 
     def __init__(self) -> None:
         self.auditor = SystemAuditor(engine=None)
-        self.engine = MatchingEngine(auditor=auditor)
-        # auditor.engine = engine
+        self.engine = MatchingEngine(auditor=self.auditor)
+        self.auditor.engine = self.engine
         self.economy = EconomyManager()
         self.user_id_mapper = UserIdMapper()
 
@@ -119,6 +118,22 @@ class OrderBookServer:
         req_type = request.get("type")
         if DEBUG_MODE:
             print(f"[{addr}] Request: {req_type}")
+
+        # Convert JSON to EngineCommand
+        try:
+            command = translate_client_message(request)
+        except ValueError:
+            return {"status": "error", "message": "Malformed request"}
+
+        # Execute: Hand command to engine
+        # Engine handles Economy, Auditing, and Matching
+        response = self.engine.execute(command, economy=self.economy)
+
+        # Response: Return result
+        if not response.success:
+            return {"status": "error", "message": response.message}
+
+        return {"status": "ok", "data": response.data}
 
         try:
             match req_type:
