@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Tuple
 
-from engine.interface import EngineAction, EngineCommand, EngineResponse
 from orderbook.book import OrderBook
 from orderbook.trade import Trade
 from orderbook.types import PriceLevel
@@ -32,51 +31,6 @@ class MatchingEngine:
     # Global Registry
     # OrderID -> OrderMetadata
     _order_registry: Dict[int, OrderMetadata] = field(default_factory=dict)
-
-    def execute(self, cmd: EngineCommand) -> EngineResponse:
-        """
-        Central dispatcher.
-        All interactions with Engine go thru this input belt.
-        """
-        try:
-            if cmd.action == EngineAction.PLACE_ORDER:
-                # We call your existing process_order logic
-                trades = self.process_order(
-                    market_id=cmd.market_id,
-                    side=cmd.side,
-                    price=cmd.price,
-                    quantity=cmd.quantity,
-                    order_id=cmd.order_id,
-                    user_id=cmd.user_id,
-                )
-                return EngineResponse(
-                    success=True, data=trades, message="Order matched"
-                )
-
-            elif cmd.action == EngineAction.CANCEL_ORDER:
-                # We call your existing cancel_order logic
-                meta = self.cancel_order(cmd.order_id)
-                if meta:
-                    return EngineResponse(
-                        success=True, data=meta, message="Order cancelled"
-                    )
-                return EngineResponse(
-                    success=False, data=None, message="Order not found"
-                )
-
-            elif cmd.action == EngineAction.GET_MARKETS:
-                # We call your existing get_active_markets logic
-                markets = self.get_active_markets()
-                return EngineResponse(success=True, data=markets)
-
-            return EngineResponse(success=False, data=None, message="Unknown action")
-
-        except Exception as e:
-            # Circuit Breaker.
-            # Prevents logic bug from crashing the whole server loop.
-            return EngineResponse(
-                success=False, data=None, message=f"Internal Engine Error: {e}"
-            )
 
     def get_or_create_market(self, market_id: MarketId) -> OrderBook:
         if market_id not in self._markets:

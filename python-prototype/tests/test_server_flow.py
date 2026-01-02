@@ -1,4 +1,5 @@
 import uuid
+from typing import Any
 
 import pytest
 
@@ -6,7 +7,7 @@ from server import OrderBookServer
 
 
 @pytest.mark.asyncio
-async def test_full_user_flow():
+async def test_full_user_flow() -> None:
     # 1. Setup: Instantiate server directly (No TCP socket needed)
     server = OrderBookServer()
     # Load/seed data if we want "market_maker" to exist
@@ -19,14 +20,14 @@ async def test_full_user_flow():
     # --- Step A: Check Initial Balance ---
     # Call process_request directly. It expects a Dict, returns a Dict.
     req_balance = {"type": "balance", "user_id": user}
-    resp_balance = await server.process_request(req_balance, addr)
+    resp_balance: dict[str, Any] = await server.process_request(req_balance, addr)  # type: ignore[assignment]
 
     # BLANK: What should the available balance be?
     assert resp_balance["available"] == "0.00"
 
     # --- Step B: Proof of Walk (Mint Money) ---
     req_walk = {"type": "proof_of_walk", "user_id": user, "steps": 10000}
-    resp_walk = await server.process_request(req_walk, addr)
+    resp_walk: dict[str, Any] = await server.process_request(req_walk, addr)  # type: ignore[assignment]
 
     assert resp_walk["status"] == "ok"
     assert resp_walk["new_balance"] == "100.00"
@@ -54,7 +55,7 @@ async def test_full_user_flow():
 
     # --- Step D: Verify Locking ---
     # Check balance again to ensure funds are locked
-    resp_final = await server.process_request(req_balance, addr)
+    resp_final: dict[str, Any] = await server.process_request(req_balance, addr)  # type: ignore[assignment]
 
     # $10.00 * 5 = $50.00 locked
     assert resp_final["available"] == "50.00"

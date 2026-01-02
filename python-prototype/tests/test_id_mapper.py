@@ -6,7 +6,7 @@
 from orderbook.id_mapper import UserIdMapper
 
 
-def test_basic_conversion():
+def test_basic_conversion() -> None:
     """Test basic string to int conversion."""
     mapper = UserIdMapper()
 
@@ -16,7 +16,7 @@ def test_basic_conversion():
     assert internal_id == 1  # First ID should be 1
 
 
-def test_idempotent_mapping():
+def test_idempotent_mapping() -> None:
     """Same string should always map to same int."""
     mapper = UserIdMapper()
 
@@ -28,7 +28,7 @@ def test_idempotent_mapping():
     assert id1 == 1
 
 
-def test_sequential_id_assignment():
+def test_sequential_id_assignment() -> None:
     """IDs should be assigned sequentially starting from 1."""
     mapper = UserIdMapper()
 
@@ -41,7 +41,7 @@ def test_sequential_id_assignment():
     assert charlie_id == 3
 
 
-def test_bidirectional_mapping():
+def test_bidirectional_mapping() -> None:
     """Test converting back from internal ID to string."""
     mapper = UserIdMapper()
 
@@ -54,7 +54,7 @@ def test_bidirectional_mapping():
     assert external_id == "alice"
 
 
-def test_multiple_users():
+def test_multiple_users() -> None:
     """Test mapping multiple different users."""
     mapper = UserIdMapper()
 
@@ -76,7 +76,7 @@ def test_multiple_users():
         assert mapper.to_external(internal_id) == user
 
 
-def test_has_external():
+def test_has_external() -> None:
     """Test has_external method."""
     mapper = UserIdMapper()
 
@@ -87,7 +87,7 @@ def test_has_external():
     assert not mapper.has_external("bob")
 
 
-def test_has_internal():
+def test_has_internal() -> None:
     """Test has_internal method."""
     mapper = UserIdMapper()
 
@@ -98,7 +98,7 @@ def test_has_internal():
     assert not mapper.has_internal(999)
 
 
-def test_to_external_raises_keyerror():
+def test_to_external_raises_keyerror() -> None:
     """Test that to_external raises KeyError for unmapped IDs."""
     mapper = UserIdMapper()
 
@@ -110,7 +110,7 @@ def test_to_external_raises_keyerror():
         pass  # Expected
 
 
-def test_round_trip_multiple():
+def test_round_trip_multiple() -> None:
     """Test round-trip conversion for multiple users."""
     mapper = UserIdMapper()
 
@@ -126,7 +126,7 @@ def test_round_trip_multiple():
     assert round_trip_users == test_users
 
 
-def test_different_string_formats():
+def test_different_string_formats() -> None:
     """Test that mapper handles different string formats."""
     mapper = UserIdMapper()
 

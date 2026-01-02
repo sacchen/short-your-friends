@@ -3,7 +3,7 @@
 from orderbook.book import OrderBook
 
 
-def test_bid_priority():
+def test_bid_priority() -> None:
     book = OrderBook()
     # Add bids at different prices
     book.add_order("buy", 100, 10, 1, user_id=1)
@@ -14,7 +14,7 @@ def test_bid_priority():
     assert book.get_best_bid() == 105
 
 
-def test_ask_priority():
+def test_ask_priority() -> None:
     book = OrderBook()
     # Add asks at different prices
     book.add_order("sell", 100, 10, 1, user_id=1)
@@ -25,7 +25,7 @@ def test_ask_priority():
     assert book.get_best_ask() == 95
 
 
-def test_lazy_deletion_bids():
+def test_lazy_deletion_bids() -> None:
     book = OrderBook()
     book.add_order("buy", 100, 10, 1, user_id=1)  # Best price
     book.add_order("buy", 99, 10, 2, user_id=2)  # Second best
@@ -40,7 +40,7 @@ def test_lazy_deletion_bids():
     assert book.get_best_bid() == 99
 
 
-def test_lazy_deletion_asks():
+def test_lazy_deletion_asks() -> None:
     book = OrderBook()
     book.add_order("sell", 100, 10, 1, user_id=1)  # Best price
     book.add_order("sell", 101, 10, 2, user_id=2)  # Second best
@@ -53,7 +53,7 @@ def test_lazy_deletion_asks():
     assert book.get_best_ask() == 101
 
 
-def test_time_priority_fifo():
+def test_time_priority_fifo() -> None:
     """
     Scenario:
     1. Alice sells 10 @ $100 (Order ID 1)

@@ -30,7 +30,7 @@ class OrderBookFuzzer(RuleBasedStateMachine):
     created_order_ids = Bundle("order_ids")
 
     @initialize()
-    def setup_system(self):
+    def setup_system(self) -> None:
         self.economy = EconomyManager()
         self.engine = MatchingEngine()
 
@@ -61,7 +61,7 @@ class OrderBookFuzzer(RuleBasedStateMachine):
         qty=st.integers(min_value=1, max_value=10),
         user=st.sampled_from(["alice", "bob"]),
     )
-    def place_limit_order(self, side, price, qty, user):
+    def place_limit_order(self, side: str, price: int, qty: int, user: str) -> int:
         """
         Simulate Server Logic: Lock funds -> Place Order -> Settle Trades
         """
@@ -106,7 +106,7 @@ class OrderBookFuzzer(RuleBasedStateMachine):
         return order_id
 
     @rule(order_id=consumes(created_order_ids))
-    def cancel_order(self, order_id):
+    def cancel_order(self, order_id: int) -> None:
         """
         Simulate Server Logic: Cancel Order -> Refund Locked Cash
         """
@@ -122,7 +122,7 @@ class OrderBookFuzzer(RuleBasedStateMachine):
             )
 
     @invariant()
-    def verify_financial_integrity(self):
+    def verify_financial_integrity(self) -> None:
         """
         The Holy Grail:
         Total Cash in System must be conserved.

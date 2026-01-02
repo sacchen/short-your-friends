@@ -13,7 +13,7 @@ def create_order(id: int, qty: int) -> OrderNode:
     )
 
 
-def test_append_updates_volume():
+def test_append_updates_volume() -> None:
     ol = OrderList()
     o1 = create_order(1, 10)
     o2 = create_order(2, 5)
@@ -31,7 +31,7 @@ def test_append_updates_volume():
     assert o2.prev_node == o1
 
 
-def test_remove_head():
+def test_remove_head() -> None:
     ol = OrderList()
     o1 = create_order(1, 10)
     o2 = create_order(2, 20)
@@ -46,7 +46,7 @@ def test_remove_head():
     assert o2.prev_node is None
 
 
-def test_remove_tail():
+def test_remove_tail() -> None:
     ol = OrderList()
     o1 = create_order(1, 10)
     o2 = create_order(2, 20)
@@ -61,7 +61,7 @@ def test_remove_tail():
     assert o1.next_node is None
 
 
-def test_remove_middle():
+def test_remove_middle() -> None:
     ol = OrderList()
     o1 = create_order(1, 10)
     o2 = create_order(2, 20)

@@ -262,6 +262,14 @@ class EngineInterface:
         4. Handle price improvement refunds
         5. Run audit (if debug mode)
         """
+        # Validate required fields for PLACE_ORDER
+        assert cmd.market_id is not None, "market_id required for PLACE_ORDER"
+        assert cmd.side is not None, "side required for PLACE_ORDER"
+        assert cmd.price is not None, "price required for PLACE_ORDER"
+        assert cmd.quantity is not None, "quantity required for PLACE_ORDER"
+        assert cmd.order_id is not None, "order_id required for PLACE_ORDER"
+        assert cmd.user_id is not None, "user_id required for PLACE_ORDER"
+
         # Convert user_id back to string for economy
         user_id_str = self.user_id_mapper.to_external(cmd.user_id)
         price_decimal = Decimal(cmd.price) / 100  # cents → dollars
@@ -353,6 +361,9 @@ class EngineInterface:
         Cancel order and release locked funds if buy order.
         Uses O(1) engine lookup.
         """
+        # Validate required fields for CANCEL_ORDER
+        assert cmd.order_id is not None, "order_id required for CANCEL_ORDER"
+
         meta = self.engine.cancel_order(cmd.order_id)
 
         if not meta:
@@ -378,6 +389,10 @@ class EngineInterface:
         """
         Settle all markets for target user based on actual screentime.
         """
+        # Validate required fields for SETTLE_MARKETS
+        assert cmd.target_user_id is not None, "target_user_id required for SETTLE_MARKETS"
+        assert cmd.actual_screentime_minutes is not None, "actual_screentime_minutes required for SETTLE_MARKETS"
+
         all_trades = []
         markets_settled = 0
 
@@ -424,7 +439,7 @@ class EngineInterface:
         Converts internal ID (1) back to username string ("alice") for client display.
         """
         raw_markets = self.engine.get_active_markets()
-        clean_markets = []
+        clean_markets: list[dict[str, Any]] = []
 
         for m in raw_markets:
             try:
@@ -460,5 +475,5 @@ class EngineInterface:
         else:
             market_id = cmd.market_id
 
-        snapshot = self.engine.get_market_snapshot(market_id)
+        snapshot: dict[str, Any] = self.engine.get_market_snapshot(market_id)
         return snapshot

@@ -3,12 +3,13 @@ import os
 import socket
 import time
 import uuid
+from typing import Any
 
 HOST = os.getenv("TEST_SERVER_HOST", "127.0.0.1")
 PORT = int(os.getenv("TEST_SERVER_PORT", "8888"))
 
 
-def send_request(sock, request_dict):
+def send_request(sock: socket.socket, request_dict: dict[str, Any]) -> dict[str, Any]:
     msg = json.dumps(request_dict).encode() + b"\n"
     sock.sendall(msg)
     data = b""
@@ -17,10 +18,11 @@ def send_request(sock, request_dict):
         if not chunk:
             break
         data += chunk
-    return json.loads(data.decode().strip())
+    result: dict[str, Any] = json.loads(data.decode().strip())
+    return result
 
 
-def test_persistence():
+def test_persistence() -> None:
     """Verify that state is saved and retrievable."""
     user = f"persist_test_{uuid.uuid4().hex[:8]}"
 

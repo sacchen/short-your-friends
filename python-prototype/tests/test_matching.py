@@ -3,7 +3,7 @@
 from orderbook.book import OrderBook
 
 
-def test_full_match_buy_side():
+def test_full_match_buy_side() -> None:
     """
     Scenario:
     1. Sell Order (Maker) at $100 for 10 qty.
@@ -38,7 +38,7 @@ def test_full_match_buy_side():
     assert book.get_best_bid() is None
 
 
-def test_partial_match_price_improvement():
+def test_partial_match_price_improvement() -> None:
     """
     Scenario:
     1. Buy Order (Maker) at $100 for 10 qty.
@@ -75,7 +75,7 @@ def test_partial_match_price_improvement():
     assert book.get_best_ask() is None
 
 
-def test_multi_level_sweep():
+def test_multi_level_sweep() -> None:
     """
     Scenario: WALKING THE BOOK
     1. Sell Order at $100 (qty 5)

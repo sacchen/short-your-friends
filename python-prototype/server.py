@@ -48,9 +48,8 @@ class OrderBookServer:
 
     def __init__(self) -> None:
         self.economy = EconomyManager()
-        self.auditor = SystemAuditor(engine=None, economy=self.economy)
         self.engine = MatchingEngine()
-        self.auditor.engine = self.engine
+        self.auditor = SystemAuditor(engine=self.engine, economy=self.economy)
         self.user_id_mapper = UserIdMapper()
 
         self.interface = EngineInterface(
@@ -136,7 +135,7 @@ class OrderBookServer:
             resp_obj = self.interface.execute(command)
 
             # Convert EngineRespones object back to a Dictionary for JSON
-            response = {
+            response: dict[str, Any] = {
                 "status": "ok" if resp_obj.success else "error",
                 "message": resp_obj.message,
             }

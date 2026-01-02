@@ -5,9 +5,10 @@
 # to send raw strings ending in `\n`
 import json
 import socket
+from typing import Any
 
 
-def send_request(sock, request_dict):
+def send_request(sock: socket.socket, request_dict: dict[str, Any]) -> dict[str, Any]:
     """Helper to send JSON and get JSON response"""
     msg = json.dumps(request_dict).encode() + b"\n"
     sock.sendall(msg)
@@ -19,10 +20,11 @@ def send_request(sock, request_dict):
             raise ConnectionError("Server closed connection")
         data += chunk
 
-    return json.loads(data.decode().strip())
+    result: dict[str, Any] = json.loads(data.decode().strip())
+    return result
 
 
-def test_market_discovery():
+def test_market_discovery() -> None:
     """Test that markets can be created and discovered"""
     import os
 

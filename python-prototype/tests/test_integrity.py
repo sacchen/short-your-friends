@@ -8,7 +8,7 @@ from orderbook.economy import EconomyManager
 from orderbook.engine import MatchingEngine
 
 
-def test_system_stress():
+def test_system_stress() -> None:
     engine = MatchingEngine()
     economy = EconomyManager()
     auditor = SystemAuditor(engine, economy)

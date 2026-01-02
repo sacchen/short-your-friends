@@ -2,13 +2,14 @@ import json
 import os
 import socket
 import uuid
+from typing import Any
 
 # Configuration via environment variables
 HOST = os.getenv("TEST_SERVER_HOST", "127.0.0.1")
 PORT = int(os.getenv("TEST_SERVER_PORT", "8888"))
 
 
-def send_request(sock, request_dict):
+def send_request(sock: socket.socket, request_dict: dict[str, Any]) -> dict[str, Any]:
     """Helper to send JSON and get JSON response"""
     msg = json.dumps(request_dict).encode() + b"\n"
     sock.sendall(msg)
@@ -19,10 +20,11 @@ def send_request(sock, request_dict):
         if not chunk:
             raise ConnectionError("Server closed connection")
         data += chunk
-    return json.loads(data.decode().strip())
+    result: dict[str, Any] = json.loads(data.decode().strip())
+    return result
 
 
-def test_integration():
+def test_integration() -> None:
     # Use a unique test user for THIS specific test run
     user = f"test_user_{uuid.uuid4().hex[:8]}"
 

@@ -40,3 +40,5 @@
   - Why is this separation better?
   - What did the old code do that the new code also does?
   - What bugs could this prevent?
+
+  Note: Request → translate → lock funds → match → settle → audit → response
