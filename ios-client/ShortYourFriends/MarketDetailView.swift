@@ -110,40 +110,44 @@ struct MarketDetailView: View {
         .padding()
         .navigationTitle(market.name)
         .onAppear {
-            // Auto-fill price: If buying, suggest the Ask price (market buy)
+            // Auto-fill price with best ask (suggested price for buyers)
+            // Server sends best_ask in cents (e.g., 60)
+            // Convert to dollars for TextField: 60 / 100 = 0.6 → "0.60"
             if let ask = market.bestAsk {
                 priceString = String(format: "%.2f", ask / 100.0)
             }
         }
     }
-    
+
     // MARK: - Helpers
-    
-    // Helper: Convert "41" (cents) -> "$0.41"
+
+    // Converts server representation (cents) to UI display (dollars)
+    // Example: 60 cents → "$0.60"
     func formatPrice(_ cents: Double?) -> String {
         guard let c = cents else { return "—" }
         return String(format: "$%.2f", c / 100.0)
     }
-    
+
     func submitOrder(side: String) {
-        // Simple input validation
-        guard let price = Double(priceString),
+        // Parse user input (expects dollars, e.g., "0.50")
+        guard let price = Double(priceString),  // "0.50" → 0.5
               let qty = Int(quantityString) else {
             feedbackMsg = "Invalid input"
             return
         }
-        
-        // Call the API
+
+        // Call API: price is in DOLLARS here (0.50)
+        // NetworkClient.placeOrder will convert to cents (50)
         api.placeOrder(
-            marketId: market.id,
-            side: side,
-            price: price,
+            marketId: market.id,        // "alice_480"
+            side: side,                 // "buy" or "sell"
+            price: price,               // Dollars (e.g., 0.50)
             quantity: qty
         )
-        
+
         feedbackMsg = "Sent \(side.uppercased()) for \(qty) @ $\(price)"
-        
-        // Haptic feedback (Vibrate)
+
+        // Haptic feedback (vibrate on success)
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
     }
