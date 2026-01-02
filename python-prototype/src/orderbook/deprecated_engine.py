@@ -1,9 +1,9 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Tuple
 
-from .book import OrderBook
-from .trade import Trade
-from .types import PriceLevel
+from orderbook.book import OrderBook
+from orderbook.trade import Trade
+from orderbook.types import PriceLevel
 
 # Market identifier: (target_user_id, threshold_minutes)
 type MarketId = Tuple[int, int]

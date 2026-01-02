@@ -47,10 +47,10 @@ class OrderBookServer:
     """
 
     def __init__(self) -> None:
-        self.auditor = SystemAuditor(engine=None)
-        self.engine = MatchingEngine(auditor=self.auditor)
-        self.auditor.engine = self.engine
         self.economy = EconomyManager()
+        self.auditor = SystemAuditor(engine=None, economy=self.economy)
+        self.engine = MatchingEngine()
+        self.auditor.engine = self.engine
         self.user_id_mapper = UserIdMapper()
 
         self.interface = EngineInterface(

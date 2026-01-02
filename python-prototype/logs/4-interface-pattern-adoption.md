@@ -36,7 +36,7 @@
 
   ## 4. Test Your Understanding
 
-  After fixing it, ask yourself:
+  After fixing it, ask:
   - Why is this separation better?
   - What did the old code do that the new code also does?
   - What bugs could this prevent?

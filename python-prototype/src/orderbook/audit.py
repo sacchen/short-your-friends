@@ -5,8 +5,8 @@
 
 from decimal import Decimal
 
-from .economy import EconomyManager
-from .engine import MatchingEngine
+from engine.engine import MatchingEngine
+from orderbook.economy import EconomyManager
 
 
 class SystemAuditor:

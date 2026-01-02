@@ -20,8 +20,8 @@ from decimal import Decimal
 from enum import Enum, auto
 from typing import Any, Optional
 
-from ..orderbook.economy import EconomyManager
-from ..orderbook.id_mapper import UserIdMapper
+from orderbook.economy import EconomyManager
+from orderbook.id_mapper import UserIdMapper
 
 # --- Command Types ---
 
@@ -163,9 +163,11 @@ def _parse_market_id(
     FIX: Always convert username to internal ID for engine.
     This prevents duplicate markets (eg "alice" vs "1").
     """
+    # Clint sent Dict
     if isinstance(raw_market_id, dict):
         target_user = str(raw_market_id["target_user_id"])
         minutes = int(raw_market_id["threshold_minutes"])
+    # Client sent String
     elif isinstance(raw_market_id, str):
         if "_" in raw_market_id:
             target_user, minutes_str = raw_market_id.rsplit("_", 1)
