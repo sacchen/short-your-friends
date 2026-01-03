@@ -136,6 +136,16 @@ struct MarketDetailView: View {
             return
         }
 
+        // Validate price range
+        guard price >= 0.01 else {
+            feedbackMsg = "Price must be at least $0.01"
+            return
+        }
+        guard price <= 100.0 else {
+            feedbackMsg = "Price cannot exceed $100.00"
+            return
+        }
+
         // Call API: price is in DOLLARS here (0.50)
         // NetworkClient.placeOrder will convert to cents (50)
         api.placeOrder(
