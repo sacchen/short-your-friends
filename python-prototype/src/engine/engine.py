@@ -74,6 +74,16 @@ class MatchingEngine:
                 if trade.maker_order_id in self._order_registry:
                     # Update the metadata object in place
                     self._order_registry[trade.maker_order_id].quantity = maker_node.quantity
+                else:
+                    # Maker order exists in book but not in registry
+                    # Reconstruct metadata from book state
+                    self._order_registry[trade.maker_order_id] = OrderMetadata(
+                        market_id=market_id,
+                        side="sell" if side == "buy" else "buy",  # Opposite side
+                        price=maker_node.price,
+                        quantity=maker_node.quantity,
+                        user_id=maker_node.user_id,
+                    )
 
         # Sync Registry for Taker (new order you just placed)
         # If the taker order wasn't fully filled,
@@ -297,3 +307,26 @@ class MatchingEngine:
 
             except ValueError as e:
                 print(f"[!] Error loading market {key_str}: {e}")
+
+        # Rebuild registry from loaded book state
+        self._rebuild_registry()
+
+    def _rebuild_registry(self) -> None:
+        """Rebuild registry from current book state after load."""
+        self._order_registry.clear()
+        for market_id, book in self._markets.items():
+            for order_id, order_node in book._orders.items():
+                # Determine side by checking which price list it's in
+                # If the price exists in bids, it's a buy order
+                if order_node.price in book._bids:
+                    side = "buy"
+                else:
+                    side = "sell"
+
+                self._order_registry[order_id] = OrderMetadata(
+                    market_id=market_id,
+                    side=side,
+                    price=order_node.price,
+                    quantity=order_node.quantity,
+                    user_id=order_node.user_id,
+                )
