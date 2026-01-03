@@ -255,12 +255,21 @@ class MatchingEngine:
             try:
                 # Parse key: Handle the "alice,480" format from server.py
                 if "," in key_str:
-                    target_user, minutes_str = key_str.split(",")
+                    target_user_str, minutes_str = key_str.split(",")
                 elif ":" in key_str:
-                    target_user, minutes_str = key_str.split(":")
+                    target_user_str, minutes_str = key_str.split(":")
                 else:
                     # If it's just a raw tuple string or weird format, skip or log
                     print(f"[!] Skipping invalid market key: {key_str}")
+                    continue
+
+                # NEW: Always convert to int for engine (internal ID)
+                try:
+                    target_user = int(target_user_str)
+                except ValueError:
+                    # Legacy: String username in saved state - log warning and skip
+                    print(f"[!] WARNING: Found username '{target_user_str}' in saved state")
+                    print(f"    Save format mismatch. Skipping market {key_str}.")
                     continue
 
                 # Reconstruct Tuple ID

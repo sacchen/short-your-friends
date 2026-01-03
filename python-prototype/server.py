@@ -272,19 +272,8 @@ class OrderBookServer:
         economy_state = self.economy.dump_state()
         mapper_state = self.user_id_mapper.dump_state()
 
-        # Convert Tuple keys in markets to Strings for JSON
-        # Engine uses keys like (1, 60) that JSON cannot serialize
-        if "markets" in engine_state:
-            str_key_markets = {}
-            for k, v in engine_state["markets"].items():
-                if isinstance(k, tuple):
-                    # Convert (1, 60) -> "1,60"
-                    key_str = f"{k[0]},{k[1]}"
-                    str_key_markets[key_str] = v
-                else:
-                    str_key_markets[k] = v
-            engine_state["markets"] = str_key_markets
-
+        # Engine already returns markets with string keys ("1,480")
+        # No conversion needed here
         data = {
             "economy": economy_state,
             "engine": engine_state,
