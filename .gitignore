@@ -22,7 +22,7 @@ state.json
 
 # Claude AI local/personal files
 **/.claude/
-python-prototype/CLAUDE.md
+# python-prototype/CLAUDE.md
 
 # Swift / Xcode
 .DS_Store

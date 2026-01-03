@@ -281,7 +281,7 @@ class NetworkClient: ObservableObject {
     func placeOrder(marketId: String, side: String, price: Double, quantity: Int) {
         // Convert dollars to cents for server
         // Example: 0.50 * 100 = 50.0 → Int cast → 50
-        let priceInCents = Int(price * 100)
+        let priceInCents = Int((price * 100).rounded())
 
         let payload: [String: Any] = [
             "type": "place_order",
