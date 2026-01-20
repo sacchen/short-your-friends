@@ -24,6 +24,7 @@
 You MUST follow this cycle. Do not jump straight to coding for complex tasks.
 
 1.  **Explore (Read-Only)**:
+    * root/`ARCHITECTURE.md` shows systems overview and interfaces.
     * Read relevant files.
     * Use `claude --permission-mode plan` or ask "Analyze X" first.
 2.  **Plan (The "Think" Step)**:

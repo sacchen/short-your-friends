@@ -1,4 +1,4 @@
-from typing import Literal, NotRequired, TypedDict, Union
+from typing import Literal, NotRequired, TypedDict
 
 # Primitives
 Side = Literal["buy", "sell"]
@@ -39,7 +39,7 @@ class SettlementResponse(TypedDict):
 
 # Sum Type (Tagged Union)
 # Any valid message must be one of these three:
-ClientMessage = Union[LimitOrderRequest, CancelOrderRequest, ReadBookRequest, SettleMarketRequest]
+ClientMessage = LimitOrderRequest | CancelOrderRequest | ReadBookRequest | SettleMarketRequest
 
 
 # Response Objects (Server -> Client)

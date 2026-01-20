@@ -10,9 +10,9 @@ from hypothesis.stateful import (
     rule,
 )
 
+from engine.engine import MatchingEngine
 from orderbook.audit import SystemAuditor
-from orderbook.economy import EconomyManager
-from orderbook.engine import MatchingEngine
+from orderbook.economy import EconomyManager, Position
 
 # Market ID helper: (target_user_id, threshold)
 # We'll stick to one market for simplicity in fuzzing: ("alice", 10)
@@ -45,8 +45,8 @@ class OrderBookFuzzer(RuleBasedStateMachine):
         # 2. Setup Inventory (Shares)
         # Alice needs shares to sell. Bob needs shares to sell.
         # We manually inject shares into the portfolio for testing
-        self.economy.get_account("alice").portfolio[MARKET_ID_STR] = 100
-        self.economy.get_account("bob").portfolio[MARKET_ID_STR] = 100
+        self.economy.get_account("alice").portfolio[MARKET_ID_STR] = Position(quantity=100)
+        self.economy.get_account("bob").portfolio[MARKET_ID_STR] = Position(quantity=100)
 
         # 3. Create the Market in the Engine
         self.engine.create_market(MARKET_ID_TUPLE, "Alice > 10m")

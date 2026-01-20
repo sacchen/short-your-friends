@@ -7,6 +7,20 @@ DOOMSCROLL_TAX_RATE = Decimal("5.00")  # Credits burned per hour
 
 
 @dataclass
+class Position:
+    quantity: int = 0
+    # Cost Basis
+    # Average entry price in dollars/cents (Decimal for precision)
+    average_entry_price: Decimal = field(default_factory=lambda: Decimal("0.00"))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "quantity": self.quantity,
+            "average_entry_price": str(self.average_entry_price),
+        }
+
+
+@dataclass
 class Account:
     user_id: str
     # Total equity = available + locked
@@ -14,7 +28,7 @@ class Account:
     balance_locked: Decimal = field(default_factory=lambda: Decimal("0.00"))  # Money in active buy orders
 
     # Track shares: Key=MarketID (eg "alice,480"), Value=Quantity
-    portfolio: dict[str, int] = field(default_factory=dict)
+    portfolio: dict[str, Position] = field(default_factory=dict)
 
     def total_equity(self) -> Decimal:
         # result: Decimal = self.balance_available + self.balance_locked
@@ -100,6 +114,62 @@ class EconomyManager:
             account.balance_locked -= cost
             account.balance_available += cost
 
+    def _update_position(self, user_id: str, market_id: str, change_qty: int, price: Decimal) -> None:
+        """
+        Calculates new Weighted Average Price and updates portfolio.
+        Handles: Opening, Increasing, Decreasing (Realizing P&L), and Flipping positions.
+        """
+        account = self.get_account(user_id)
+
+        # Get existing position or create new empty one
+        if market_id not in account.portfolio:
+            account.portfolio[market_id] = Position()
+
+        pos = account.portfolio[market_id]
+        current_qty = pos.quantity
+        current_avg = pos.average_entry_price
+
+        new_qty = current_qty + change_qty
+
+        # Scenario 1: Closing to 0 (Flat)
+        if new_qty == 0:
+            pos.quantity = 0
+            pos.average_entry_price = Decimal("0.00")
+
+        # Scenario 2: Opening new position (from 0)
+        if current_qty == 0:
+            pos.quantity = new_qty
+            pos.average_entry_price = price
+            return
+
+        # Check direction
+        is_same_direction = (current_qty > 0 and change_qty > 0) or (current_qty < 0 and change_qty < 0)
+
+        # Scenario 3: Increasing Position (Averaging In)
+        # Cost basis needs to be updated.
+        if is_same_direction:
+            # Weighted Average Formula: (OldVal + NewVal) / TotalQty
+            total_val = (Decimal(abs(current_qty)) * current_avg) + (Decimal(abs(change_qty)) * price)
+            total_qty = Decimal(abs(new_qty))
+            pos.average_entry_price = total_val / total_qty
+            pos.quantity = new_qty
+            return
+
+        # Scenario 4: Decreasing Position (Partial Close)
+        # Reducing exposure, so cost basis does not change.
+        # Realizing P&L on portion sold
+        is_partial_close = abs(new_qty) < abs(current_qty)
+
+        if is_partial_close:
+            pos.quantity = new_qty
+            # avg_entry_price stays the same
+            return
+
+        # Scneario 5: Flipping Position (Long to Short or Short to Long)
+        # This closes old position and opens a new one with remainder.
+        pos.quantity = new_qty
+        pos.average_entry_price = price
+
     def confirm_trade(
         self,
         buyer_id: str,
@@ -109,15 +179,16 @@ class EconomyManager:
         quantity: int,
     ) -> None:
         """
-        Executes cash transfer
+        Executes cash transfer and updates portfolio positions.
         Buyer: Locked funds are removed/spent.
         Seller: Funds are added to available balance.
         Only substracts locked cash from Buyer
         """
         cost = price * Decimal(quantity)
 
-        # Buyer: Pays Cash, Gets Shares
-        # funds were already locked, so we take money out of Locked
+        # -- 1: Handle Cash Logic --
+
+        # Buyer: Pays Cash (from Locked)
         buyer = self.get_account(buyer_id)
         buyer.balance_locked -= cost
         # TODO: In database, assert >0
@@ -127,19 +198,17 @@ class EconomyManager:
             print(f"CRITICAL: Buyer {buyer_id} had negative locked balance! Resetting.")
             buyer.balance_locked = Decimal("0.00")
 
-        # Add shares to buyer portfolio
-        current_qty = buyer.portfolio.get(market_id, 0)
-        buyer.portfolio[market_id] = current_qty + quantity
-
-        # Seller: Gets Cash, Loses Shares
-        # They never locked cash, so we just add to "Available"
+        # Seller: Gets Cash (to Available)
         seller = self.get_account(seller_id)
         seller.balance_available += cost
 
-        # Remove shares from seller portfolio
-        # Negative means they are Short
-        current_qty = seller.portfolio.get(market_id, 0)
-        seller.portfolio[market_id] = current_qty - quantity
+        # -- 2: Handle Portfolio/Position Logic --
+
+        # Buyer: Adds +Quantity
+        self._update_position(buyer_id, market_id, quantity, price)
+
+        # Seller: Adds -Quantity (Shorts)
+        self._update_position(seller_id, market_id, -quantity, price)
 
     def distribute_ubi(self, amount: Decimal = Decimal("100.00")) -> None:
         """Give everyone their daily bread."""
@@ -155,7 +224,9 @@ class EconomyManager:
             user_id: {
                 "available": str(acc.balance_available),
                 "locked": str(acc.balance_locked),
-                "portfolio": acc.portfolio,  # This is Dict[str, int], not str
+                "portfolio": {
+                    mid: pos.to_dict() for mid, pos in acc.portfolio.items()
+                },  # This is Dict[str, int], not str
             }
             for user_id, acc in self.accounts.items()  # keys, values
             # acc is the Value (`Account` object)
@@ -168,10 +239,23 @@ class EconomyManager:
             acc = Account(user_id=user_id)
             acc.balance_available = Decimal(balances["available"])
             acc.balance_locked = Decimal(balances["locked"])
-            # Portfolio can be dict or missing
+
+            # Load Portfolio with Migration Path
             portfolio_data = balances.get("portfolio", {})
-            if isinstance(portfolio_data, dict):
-                acc.portfolio = portfolio_data
-            else:
-                acc.portfolio = {}
+            acc.portfolio = {}
+
+            for mid, pos_data in portfolio_data.items():
+                if isinstance(pos_data, dict):
+                    # Using PositionData format
+                    p = Position(
+                        quantity=int(pos_data.get("quantity", 0)),
+                        average_entry_price=Decimal(pos_data.get("average_entry_price", "0.00")),
+                    )
+                    acc.portfolio[mid] = p
+                else:
+                    # Backward compatibility for old format (int)
+                    # Assume entry price is 0 if migrating
+                    p = Position(quantity=int(pos_data), average_entry_price=Decimal("0.00"))
+                    acc.portfolio[mid] = p
+
             self.accounts[user_id] = acc

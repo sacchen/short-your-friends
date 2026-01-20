@@ -3,9 +3,9 @@
 import random
 from decimal import Decimal
 
+from engine.engine import MatchingEngine
 from orderbook.audit import SystemAuditor
 from orderbook.economy import EconomyManager
-from orderbook.engine import MatchingEngine
 
 
 def test_system_stress() -> None:
@@ -48,5 +48,6 @@ if __name__ == "__main__":
 
 # Failure Type and What it means
 # Market unbalanced: book.process_order logic is failing to update the buyer's and seller's positions equally. One side is ""leaking"" contracts.
-# Cash Audit Failure: likely have a bug in release_order_lock. either double-refunding or failing to unlock money when an order is cancelled or filled.
+# Cash Audit Failure: likely have a bug in release_order_lock. either
+# double-refunding or failing to unlock money when an order is cancelled or filled.
 # Registry Mismatch: This confirms the ""Partial Fill"" logic. If fail, the registry (the global map) is out of sync with the actual orders resting on the book.

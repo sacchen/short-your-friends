@@ -23,7 +23,7 @@ from orderbook.types import (
 # Set to False during stress tests to save CPU cycles
 DEBUG_MODE = True
 DB_FILE = "state.json"
-ResponseTypes = ActionResponse, SnapshotResponse, SettlementResponse, dict[str, Any]
+ResponseTypes = ActionResponse | SnapshotResponse | SettlementResponse | dict[str, Any]
 
 
 class DecimalEncoder(json.JSONEncoder):
@@ -194,14 +194,14 @@ class OrderBookServer:
 
         # Format Portfolio for Swift Client
         positions_list = []
-        for m_id, qty in account.portfolio.items():
-            if qty != 0:
+        for m_id, position in account.portfolio.items():
+            if position.quantity != 0:
                 positions_list.append(
                     {
                         "market_id": m_id,
-                        "side": "LONG" if qty > 0 else "SHORT",
-                        "qty": abs(qty),
-                        "average_price": 0.0,  # Placeholder
+                        "side": "LONG" if position.quantity > 0 else "SHORT",
+                        "qty": abs(position.quantity),
+                        "average_price": str(position.average_entry_price),
                     }
                 )
 
