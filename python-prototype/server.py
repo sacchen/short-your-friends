@@ -22,7 +22,7 @@ from orderbook.types import (
 
 # Set to False during stress tests to save CPU cycles
 DEBUG_MODE = True
-DB_FILE = "state.json"
+DB_FILE = os.getenv("STATE_FILE", "state.json")
 ResponseTypes = ActionResponse | SnapshotResponse | SettlementResponse | dict[str, Any]
 
 
