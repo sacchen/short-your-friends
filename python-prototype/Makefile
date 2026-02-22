@@ -1,7 +1,9 @@
+.DEFAULT_GOAL := help
 .PHONY: help test-local test-unit test-integration test-prod deploy bench type-check run-server ci-check
 
 help:
 	@echo "Available commands:"
+	@echo "  make             - Show this help"
 	@echo "  make test-local  - Run pytest locally"
 	@echo "  make test-unit   - Run unit/invariant tests only"
 	@echo "  make test-integration - Run server-backed integration tests"
