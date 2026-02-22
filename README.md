@@ -37,6 +37,7 @@ This is not a SaaS app yet. It is an engineering prototype focused on trading-sy
 - `ios-client/`: Swift client prototype
 - `ARCHITECTURE.md`: concise system design reference
 - `docs/DEVELOPER_GUIDE.md`: contributor command guide
+- `docs/DOCKER.md`: Docker Compose local stack guide
 - `CONTRIBUTING.md`: contribution workflow
 
 ## Quick evaluation path

@@ -3,6 +3,7 @@
 Reference backend for the shortyourfriends exchange prototype.
 
 Primary command reference: `../docs/DEVELOPER_GUIDE.md`
+Containerized local stack: `../docs/DOCKER.md`
 
 Includes:
 - Async TCP server (`server.py`)
@@ -68,3 +69,4 @@ make bench
 
 - Prices are represented as integer cents in engine/server paths.
 - Current persistence is JSON (`state.json`); PostgreSQL migration is tracked in issue `#4`.
+- Server state file path can be overridden with `STATE_FILE` (used by Docker Compose).

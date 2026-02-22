@@ -7,6 +7,7 @@ If you only read one file to work on this repo, read this one.
 - System design and boundaries: `ARCHITECTURE.md`
 - Backend-specific details: `python-prototype/README.md`
 - Contribution expectations: `CONTRIBUTING.md`
+- Docker workflow: `docs/DOCKER.md`
 
 ## Quick start
 Run from `python-prototype/`:
@@ -55,3 +56,12 @@ make test-integration
 - Next infra priorities:
   - Docker Compose (`#6`)
   - PostgreSQL transactional persistence (`#4`)
+
+## Containerized workflow (optional)
+From repo root:
+
+```bash
+docker compose up --build
+```
+
+See `docs/DOCKER.md` for logs, teardown, integration-test commands, and volume reset.
