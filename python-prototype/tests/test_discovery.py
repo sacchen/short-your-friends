@@ -7,6 +7,10 @@ import json
 import socket
 from typing import Any
 
+import pytest
+
+pytestmark = pytest.mark.integration
+
 
 def send_request(sock: socket.socket, request_dict: dict[str, Any]) -> dict[str, Any]:
     """Helper to send JSON and get JSON response"""

@@ -47,7 +47,9 @@ if __name__ == "__main__":
     test_system_stress()
 
 # Failure Type and What it means
-# Market unbalanced: book.process_order logic is failing to update the buyer's and seller's positions equally. One side is ""leaking"" contracts.
-# Cash Audit Failure: likely have a bug in release_order_lock. either
-# double-refunding or failing to unlock money when an order is cancelled or filled.
-# Registry Mismatch: This confirms the ""Partial Fill"" logic. If fail, the registry (the global map) is out of sync with the actual orders resting on the book.
+# Market unbalanced: book.process_order likely fails to update buyer and seller
+# positions equally. One side is "leaking" contracts.
+# Cash Audit Failure: likely have a bug in release_order_lock; either
+# double-refunding or failing to unlock money when an order is cancelled/filled.
+# Registry Mismatch: confirms "Partial Fill" logic drift. If this fails, the
+# registry (global map) is out of sync with orders resting on the book.

@@ -4,9 +4,12 @@ import socket
 import uuid
 from typing import Any
 
+import pytest
+
 # Configuration via environment variables
 HOST = os.getenv("TEST_SERVER_HOST", "127.0.0.1")
 PORT = int(os.getenv("TEST_SERVER_PORT", "8888"))
+pytestmark = pytest.mark.integration
 
 
 def send_request(sock: socket.socket, request_dict: dict[str, Any]) -> dict[str, Any]:
