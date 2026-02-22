@@ -1,37 +1,51 @@
 # shortyourfriends
 
-Binary prediction market prototype for betting on screen-time outcomes.
+`shortyourfriends` is a systems-focused prediction market prototype.
 
-The project currently includes:
-- A Python matching engine and TCP server (`python-prototype/`)
-- An iOS client prototype (`ios-client/`)
-- Architecture and learning notes (`ARCHITECTURE.md`, `python-prototype/logs/`)
+Users trade binary contracts on screen-time outcomes, backed by a custom limit order book and matching engine.
 
-## Repository map
-- `python-prototype/`: backend engine, server, simulation scripts, and tests
-- `ios-client/`: SwiftUI client using raw TCP messaging
-- `ARCHITECTURE.md`: backend and client architecture reference
-- `contributing.md`: contributor workflow and standards
+## What you are looking at
+- A working Python exchange backend (TCP server + matching engine)
+- An iOS client prototype that talks to the backend over raw TCP
+- Automated CI for linting, type checks, unit tests, and integration tests
 
-## Current priorities
-- CI quality gates are in place (`ruff`, `mypy`, unit + integration tests)
-- Next infrastructure milestones:
-  - Docker Compose local stack
-  - PostgreSQL transactional persistence
+This is not a SaaS app yet. It is an engineering prototype focused on trading-system architecture, correctness, and infrastructure hardening.
 
-Tracked in GitHub issues:
-- `#3` Infrastructure hardening tracker
-- `#4` PostgreSQL persistence
-- `#5` CI quality gates
-- `#6` Docker + Compose
+## Implemented today
+- Price-time matching engine with multi-market support
+- O(1)-style global order cancellation registry
+- Economy/accounting layer with locked vs available balances
+- Invariant auditing (positions, cash conservation, registry consistency)
+- End-to-end socket integration tests against a live server
+- GitHub Actions CI gates:
+  - `ruff`
+  - `mypy`
+  - `pytest` (unit/invariant)
+  - `pytest` (integration)
 
-## Quick start
-Start with `docs/DEVELOPER_GUIDE.md`.
+## In progress
+- Docker Compose local stack
+- PostgreSQL transactional persistence (replacing JSON snapshots)
 
-Then use:
-- `python-prototype/README.md` for backend run commands
-- `ARCHITECTURE.md` for system design and data flow
+## Tech stack
+- Backend: Python 3.13+, `uv`, `pytest`, `mypy`, `ruff`
+- Client: SwiftUI + Network.framework
+- Protocol: newline-delimited JSON over TCP
 
-## Notes
-- This repo uses integer cents for order-book prices to avoid floating-point errors.
-- Persistence is currently JSON-based and planned for migration to PostgreSQL.
+## Repository guide
+- `python-prototype/`: backend code, tests, simulation scripts
+- `ios-client/`: Swift client prototype
+- `ARCHITECTURE.md`: concise system design reference
+- `docs/DEVELOPER_GUIDE.md`: contributor command guide
+- `CONTRIBUTING.md`: contribution workflow
+
+## Quick evaluation path
+If you want to evaluate this project quickly:
+1. Read `ARCHITECTURE.md` for system boundaries.
+2. Open `.github/workflows/ci.yml` for quality gates.
+3. Open `python-prototype/tests/` for behavioral coverage.
+4. Run backend checks via `docs/DEVELOPER_GUIDE.md`.
+
+## Design constraints
+- Engine prices are integer cents (no floating-point money math).
+- Current persistence is JSON (`state.json`) and intentionally marked for migration to PostgreSQL transactions.
