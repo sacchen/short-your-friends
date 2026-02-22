@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python-prototype
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install uv
+        run: pip install uv
+      - name: Install dependencies
+        run: uv sync --all-groups
+      - name: Ruff
+        run: uv run ruff check .
+
+  typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python-prototype
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install uv
+        run: pip install uv
+      - name: Install dependencies
+        run: uv sync --all-groups
+      - name: Mypy
+        run: uv run mypy
+
+  tests-unit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python-prototype
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install uv
+        run: pip install uv
+      - name: Install dependencies
+        run: uv sync --all-groups
+      - name: Pytest (unit + invariant)
+        run: uv run pytest -q -m "not integration"
+
+  tests-integration:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python-prototype
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install uv
+        run: pip install uv
+      - name: Install dependencies
+        run: uv sync --all-groups
+      - name: Start server
+        run: |
+          PYTHONPATH=src uv run server.py > /tmp/server.log 2>&1 &
+          echo $! > /tmp/server.pid
+      - name: Wait for server
+        run: |
+          for i in {1..30}; do
+            if python -c "import socket; s=socket.socket(); s.settimeout(0.2); s.connect(('127.0.0.1', 8888)); s.close()"; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Server failed to start in time"
+          cat /tmp/server.log || true
+          exit 1
+      - name: Pytest (integration)
+        env:
+          TEST_SERVER_HOST: 127.0.0.1
+          TEST_SERVER_PORT: "8888"
+        run: uv run pytest -q -m integration
+      - name: Show server log on failure
+        if: failure()
+        run: cat /tmp/server.log || true
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f /tmp/server.pid ]; then
+            kill "$(cat /tmp/server.pid)" || true
+          fi

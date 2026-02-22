@@ -32,8 +32,8 @@ def test_market_discovery() -> None:
     """Test that markets can be created and discovered"""
     import os
 
-    host = os.getenv("EXCHANGE_IP", "127.0.0.1")
-    port = 8888
+    host = os.getenv("TEST_SERVER_HOST", "127.0.0.1")
+    port = int(os.getenv("TEST_SERVER_PORT", "8888"))
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
