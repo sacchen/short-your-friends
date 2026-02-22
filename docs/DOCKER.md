@@ -6,6 +6,19 @@ This stack gives you two containers:
 
 Use this when you want a reproducible local environment without installing Postgres directly on your machine.
 
+## 0) macOS setup (Homebrew + Colima)
+
+If you do not use Docker Desktop, install a lightweight local engine:
+
+```bash
+brew install docker docker-compose colima
+colima start
+docker version
+docker compose version
+```
+
+`colima start` boots the container runtime. The Docker CLI then talks to that runtime.
+
 ## 1) Start the stack
 
 From repo root:
@@ -57,3 +70,16 @@ This removes:
 - `STATE_FILE=/data/state.json` is read by `server.py`.
 - `DATABASE_URL` is provided now so the app environment is ready for issue `#4` (Postgres migration).
 - Current backend persistence still uses JSON; Postgres is running in parallel for next steps.
+
+## Docker mental model (quick)
+
+- Image: a packaged filesystem + startup command (blueprint).
+- Container: a running instance of an image (process with isolation).
+- Service (Compose): a named container config (build/image/env/ports/volumes).
+- Volume: persistent storage outside container lifecycle.
+- Network: service-to-service communication (here, `app` talks to `postgres` by service name).
+
+In this project:
+- `app` service runs your Python server image.
+- `postgres` service runs the official Postgres image.
+- `app_state` and `pg_data` volumes keep state after restarts.
