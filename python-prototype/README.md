@@ -2,6 +2,8 @@
 
 Reference backend for the shortyourfriends exchange prototype.
 
+Primary command reference: `../docs/DEVELOPER_GUIDE.md`
+
 Includes:
 - Async TCP server (`server.py`)
 - Matching engine + order book (`src/engine`, `src/orderbook`)

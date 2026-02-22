@@ -1,10 +1,13 @@
 # Contributing
 
+Use `docs/DEVELOPER_GUIDE.md` as the primary operational reference.
+
 ## Setup
 Run from `python-prototype/`:
 
 ```bash
 uv sync --all-groups
+make
 ```
 
 ## Local quality checks

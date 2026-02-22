@@ -26,7 +26,11 @@ Tracked in GitHub issues:
 - `#6` Docker + Compose
 
 ## Quick start
-Backend setup and commands live in `python-prototype/README.md`.
+Start with `docs/DEVELOPER_GUIDE.md`.
+
+Then use:
+- `python-prototype/README.md` for backend run commands
+- `ARCHITECTURE.md` for system design and data flow
 
 ## Notes
 - This repo uses integer cents for order-book prices to avoid floating-point errors.
