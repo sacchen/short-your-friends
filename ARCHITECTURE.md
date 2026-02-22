@@ -6,7 +6,7 @@ For setup and commands, use `docs/DEVELOPER_GUIDE.md`.
 ## Information map
 - Day-to-day commands: `docs/DEVELOPER_GUIDE.md`
 - Backend runbook: `python-prototype/README.md`
-- Contribution workflow: `contributing.md`
+- Contribution workflow: `CONTRIBUTING.md`
 - Deep learning notes: `python-prototype/logs/`
 
 ## Current system (2026-02)

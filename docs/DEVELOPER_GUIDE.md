@@ -6,7 +6,7 @@ If you only read one file to work on this repo, read this one.
 - Getting started and commands: this file
 - System design and boundaries: `ARCHITECTURE.md`
 - Backend-specific details: `python-prototype/README.md`
-- Contribution expectations: `contributing.md`
+- Contribution expectations: `CONTRIBUTING.md`
 
 ## Quick start
 Run from `python-prototype/`:
