@@ -1,19 +1,45 @@
-# Contributing quick start guide
+# Contributing
 
 ## Setup
-- Environment: `uv sync --all-groups`
-- Pypy for benchmarks `uv python install pypy`
+Run from `python-prototype/`:
 
-## Navigation
-- Orderbook: `python-prototype/src/orderbook` contains the core data structures
-- Entry point: `python-prototype/server.py` handles networking
-- Currently refactoring `src/engine` to move into `engine/engine`
+```bash
+uv sync --all-groups
+```
+
+## Local quality checks
+Use the same checks required by CI:
+
+```bash
+uv run ruff check .
+uv run mypy
+uv run pytest -m "not integration"
+```
+
+For server-backed tests:
+
+```bash
+PYTHONPATH=src uv run server.py
+# in another shell
+TEST_SERVER_HOST=127.0.0.1 TEST_SERVER_PORT=8888 uv run pytest -m integration
+```
 
 ## Workflow
-Run commands from `python-prototype` directory.
-`python-prototype/Makefile` for common tasks:
-- `make type-check`: Runs strict Mypy checks.
-- `make bench`: Runs the matching engine benchmark with PyPy.
-- `make test-local`: Runs the pytest suite.
-- `make run-server`: Starts the TCP server (defaulting to the PYTHONPATH=src setup).
-- To switch from the Droplet to local, edit the tcp_server line in `server.py` to point to 127.0.0.1.
+1. Create a branch from `main`.
+2. Make a focused change.
+3. Add or update tests.
+4. Update relevant docs (`README.md`, `python-prototype/README.md`, `ARCHITECTURE.md` if interfaces changed).
+5. Run local quality checks.
+6. Open a PR and wait for CI.
+
+## Commit style
+Prefer small, single-purpose commits with:
+- A clear subject line
+- Why the change exists
+- What was validated
+
+## Project layout
+- `python-prototype/src/orderbook/`: core data structures and economy
+- `python-prototype/src/engine/`: engine orchestration
+- `python-prototype/server.py`: TCP server boundary
+- `ios-client/`: SwiftUI client prototype
