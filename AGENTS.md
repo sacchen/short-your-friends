@@ -43,10 +43,10 @@ CI enforces these via `.github/workflows/ci.yml`.
 ## Engineering rules
 - Use integer cents for prices in engine/server paths.
 - Keep matching/accounting invariants intact.
-- Prefer small, reviewable commits with:
-  - what changed
-  - why it changed
-  - what validation was run
+- Follow [The Perfect Commit](https://simonwillison.net/2022/Oct/29/the-perfect-commit/) style:
+  - one logical change per commit
+  - explain what/why
+  - include validation run
 
 ## Documentation rules
 - External audience: `README.md` (clear system snapshot and status)

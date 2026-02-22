@@ -36,10 +36,15 @@ TEST_SERVER_HOST=127.0.0.1 TEST_SERVER_PORT=8888 uv run pytest -m integration
 6. Open a PR and wait for CI.
 
 ## Commit style
-Prefer small, single-purpose commits with:
-- A clear subject line
-- Why the change exists
-- What was validated
+Follow the spirit of [The Perfect Commit](https://simonwillison.net/2022/Oct/29/the-perfect-commit/):
+- One logical change per commit.
+- Commit message explains what changed and why.
+- Include validation in the commit body (tests/checks run).
+
+Minimal format:
+- Subject: `<type>: <what changed>`
+- Body: `Why: ...`
+- Body: `Validation: ...`
 
 ## Project layout
 - `python-prototype/src/orderbook/`: core data structures and economy
