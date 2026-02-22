@@ -18,6 +18,31 @@ Start Market Maker (liquidity provider), Gambler (taker), and Ticker (visualizat
 iOS client reports user has exceed screen time limit. In Terminal 2, order book will clear and positions will be settled.
 `PYTHONPATH=src uv run trigger_settle.py`
 
+## Test workflow
+
+The suite is split into two categories:
+
+- Unit/invariant tests: fast tests that do not require a running TCP server.
+- Integration tests: socket-level tests that require a live server on `TEST_SERVER_HOST:TEST_SERVER_PORT`.
+
+Run from `python-prototype`:
+
+```bash
+# Unit + invariant tests only (default for quick local checks/CI)
+uv run pytest -m "not integration"
+
+# Integration tests (start server in another terminal first)
+TEST_SERVER_HOST=127.0.0.1 TEST_SERVER_PORT=8888 uv run pytest -m integration
+```
+
+To mirror the CI quality gate locally:
+
+```bash
+uv run ruff check .
+uv run mypy
+uv run pytest -m "not integration"
+```
+
 ## File structure
 - `server.py`: Async TCP server that routes JSON requests to engine.
 
