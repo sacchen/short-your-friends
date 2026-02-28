@@ -1,52 +1,82 @@
 # shortyourfriends
 
-`shortyourfriends` is a systems-focused prediction market prototype.
+**A distributed prediction market for dopamine addiction.**
 
-Users trade binary contracts on screen-time outcomes, backed by a custom limit order book and matching engine.
+A trading-system prototype where users short-sell their friends' bad habits. Capital is minted via physical activity and liquidated by screen time thresholds.
 
-## What you are looking at
-- A working Python exchange backend (TCP server + matching engine)
+## What This Repo Is
+
+This repository is an engineering prototype, not a finished product.
+
+It currently contains:
+- A working Python exchange backend with a custom limit order book and TCP server
 - An iOS client prototype that talks to the backend over raw TCP
-- Automated CI for linting, type checks, unit tests, and integration tests
+- CI for linting, type-checking, unit tests, and integration tests
 
-This is not a SaaS app yet. It is an engineering prototype focused on trading-system architecture, correctness, and infrastructure hardening.
+If you are evaluating the project, the most relevant files are:
+- `ARCHITECTURE.md`
+- `python-prototype/`
+- `.github/workflows/ci.yml`
 
-## Implemented today
-- Price-time matching engine with multi-market support
-- O(1)-style global order cancellation registry
-- Economy/accounting layer with locked vs available balances
-- Invariant auditing (positions, cash conservation, registry consistency)
-- End-to-end socket integration tests against a live server
-- GitHub Actions CI gates:
-  - `ruff`
-  - `mypy`
-  - `pytest` (unit/invariant)
-  - `pytest` (integration)
+## Components
 
-## In progress
-- Docker Compose local stack
-- PostgreSQL transactional persistence (replacing JSON snapshots)
+The system is split into three layers to model a small trading stack:
 
-## Tech stack
-- Backend: Python 3.13+, `uv`, `pytest`, `mypy`, `ruff`
-- Client: SwiftUI + Network.framework
-- Protocol: newline-delimited JSON over TCP
+**Engine (Python):**
+- Custom matching engine and order book
+- Multi-market support
+- Invariant auditing for cash, positions, and registry integrity
 
-## Repository guide
-- `python-prototype/`: backend code, tests, simulation scripts
-- `ios-client/`: Swift client prototype
-- `ARCHITECTURE.md`: concise system design reference
-- `docs/DEVELOPER_GUIDE.md`: contributor command guide
-- `docs/DOCKER.md`: Docker Compose local stack guide
-- `CONTRIBUTING.md`: contribution workflow
+**Simulation (Python):**
+- Scripts for driving market activity and settlement flows
+- Useful for testing the exchange loop outside the iOS client
 
-## Quick evaluation path
-If you want to evaluate this project quickly:
-1. Read `ARCHITECTURE.md` for system boundaries.
-2. Open `.github/workflows/ci.yml` for quality gates.
-3. Open `python-prototype/tests/` for behavioral coverage.
-4. Run backend checks via `docs/DEVELOPER_GUIDE.md`.
+**Client (Swift):**
+- iOS prototype using `Network.framework`
+- Intended to act as the data oracle for activity and screen-time events
 
-## Design constraints
-- Engine prices are integer cents (no floating-point money math).
-- Current persistence is JSON (`state.json`) and intentionally marked for migration to PostgreSQL transactions.
+## The Mechanism
+
+### 1. Economy
+Liquidity is tied to behavior:
+
+- **Income:** credits earned from physical activity
+- **Penalty:** credits burned when screen-time thresholds are crossed
+- **Constraint:** users need capital to take positions
+
+### 2. Trading
+Markets are binary contracts on user outcomes.
+
+- **Long:** bet the user stays under a threshold
+- **Short:** bet the user fails
+- **Settlement:** contracts resolve based on the reported outcome
+
+### 3. Execution
+The backend receives events, matches orders, updates balances, and settles markets.
+
+## What Is Implemented Today
+
+- Price-time matching engine
+- Global order registry for efficient cancellation
+- Economy/accounting layer with available vs locked balances
+- JSON persistence (`state.json`)
+- End-to-end socket integration tests
+- Docker Compose local stack (`app` + `postgres`)
+
+## Current Engineering Focus
+
+- Replace JSON persistence with PostgreSQL transactions
+- Continue hardening local/dev infrastructure
+
+## Design Constraints
+
+- Prices are represented as integer cents in engine/server paths
+- The TCP protocol uses newline-delimited JSON
+- Current persistence is JSON-based and intentionally being migrated
+
+## Where To Go Next
+
+- `ARCHITECTURE.md`: system boundaries and data flow
+- `docs/DEVELOPER_GUIDE.md`: commands and contributor workflow
+- `docs/DOCKER.md`: local containerized setup
+- `python-prototype/README.md`: backend-specific runbook
