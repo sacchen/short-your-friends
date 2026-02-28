@@ -13,7 +13,7 @@ It currently contains:
 - An iOS client prototype that talks to the backend over raw TCP
 - CI for linting, type-checking, unit tests, and integration tests
 
-If you are evaluating the project, the most relevant files are:
+Start here:
 - `ARCHITECTURE.md`
 - `python-prototype/`
 - `.github/workflows/ci.yml`
