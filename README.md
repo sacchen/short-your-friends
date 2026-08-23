@@ -1,82 +1,72 @@
 # shortyourfriends
 
-**A distributed prediction market for dopamine addiction.**
+**A prediction market for dopamine addiction.**
 
-A trading-system prototype where users short-sell their friends' bad habits. Capital is minted via physical activity and liquidated by screen time thresholds.
+You short-sell your friends' bad habits. Capital is minted by walking and
+burned by doomscrolling — so you have to stay off your phone to afford to
+bet that your friends won't.
 
-## What This Repo Is
+## How it works
 
-This repository is an engineering prototype, not a finished product.
+**The economy.** Liquidity is capped by physical effort and drained by
+digital consumption.
 
-It currently contains:
-- A working Python exchange backend with a custom limit order book and TCP server
-- An iOS client prototype that talks to the backend over raw TCP
-- CI for linting, type-checking, unit tests, and integration tests
+- **Proof of Walk** — you earn `0.01` credits per verified step
+- **Doomscroll Burn** — you lose `5.00` credits per hour of screen time
+- **The constraint** — you must be active to afford to short anyone
 
-Start here:
-- `ARCHITECTURE.md`
-- `python-prototype/`
-- `.github/workflows/ci.yml`
+**The market.** Each contract is a binary bet on one person clearing one
+threshold, identified as `(user, minutes)` — `alice,480` is "Alice stays
+under 8 hours today."
 
-## Components
+- **Long** — bet they stay under
+- **Short** — bet they fail
+- **Settlement** — contracts resolve to exactly 0 or 1. No partial credit.
 
-The system is split into three layers to model a small trading stack:
+When the reported screen time crosses the threshold, the contract collapses
+to zero and every short gets paid.
 
-**Engine (Python):**
-- Custom matching engine and order book
-- Multi-market support
-- Invariant auditing for cash, positions, and registry integrity
+## What runs today
 
-**Simulation (Python):**
-- Scripts for driving market activity and settlement flows
-- Useful for testing the exchange loop outside the iOS client
+- **Matching engine** — price-time priority, multi-market, integer cents
+- **Order book** — custom linked-list book with an O(1) cancellation registry
+- **Economy** — accounts, positions, available vs. locked balances
+- **Settlement** — binary resolution against a reported threshold crossing
+- **Invariant auditing** — cash conservation, position and registry integrity
+- **iOS client** — SwiftUI, browses markets over raw TCP
+- **Infrastructure** — Docker Compose (`app` + `postgres`), CI running
+  `ruff`, `mypy`, and unit + integration tests
 
-**Client (Swift):**
-- iOS prototype using `Network.framework`
-- Intended to act as the data oracle for activity and screen-time events
+## Not built yet
 
-## The Mechanism
+The exchange works. Nothing connects it to a real phone yet.
 
-### 1. Economy
-Liquidity is tied to behavior:
+- **The oracle** — screen time currently arrives from `trigger_settle.py`,
+  a script with a hardcoded number. Nothing observes a real phone.
+- **Proof of Walk** — no `HealthKit` integration; steps are never read
+- **The Snitch** — no `DeviceActivityMonitor`; nothing wakes on a threshold
+- **Rust port** — the matching engine is Python, and staying that way for now
+- **Persistence** — state lives in `state.json`; the PostgreSQL migration
+  is the current focus
 
-- **Income:** credits earned from physical activity
-- **Penalty:** credits burned when screen-time thresholds are crossed
-- **Constraint:** users need capital to take positions
+## The privacy problem
 
-### 2. Trading
-Markets are binary contracts on user outcomes.
+Apple's `DeviceActivity` API is deliberately privacy-preserving: it won't
+export raw usage data or app names, so nothing can simply read your screen
+time and report it.
 
-- **Long:** bet the user stays under a threshold
-- **Short:** bet the user fails
-- **Settlement:** contracts resolve based on the reported outcome
+The intended workaround is **Proof of Portfolio** — you pick a "portfolio of
+shame" via `FamilyActivityPicker`, the app renders a sandboxed report of
+those icons, and you export it to the group. Stuff it with Calculator and
+Notes to game the burn rate, and you get delisted by hand.
 
-### 3. Execution
-The backend receives events, matches orders, updates balances, and settles markets.
+## Look around
 
-## What Is Implemented Today
-
-- Price-time matching engine
-- Global order registry for efficient cancellation
-- Economy/accounting layer with available vs locked balances
-- JSON persistence (`state.json`)
-- End-to-end socket integration tests
-- Docker Compose local stack (`app` + `postgres`)
-
-## Current Engineering Focus
-
-- Replace JSON persistence with PostgreSQL transactions
-- Continue hardening local/dev infrastructure
-
-## Design Constraints
-
-- Prices are represented as integer cents in engine/server paths
-- The TCP protocol uses newline-delimited JSON
-- Current persistence is JSON-based and intentionally being migrated
-
-## Where To Go Next
-
-- `ARCHITECTURE.md`: system boundaries and data flow
-- `docs/DEVELOPER_GUIDE.md`: commands and contributor workflow
-- `docs/DOCKER.md`: local containerized setup
-- `python-prototype/README.md`: backend-specific runbook
+- [`python-prototype/logs/`](python-prototype/logs/) — six design decisions
+  written up as they were made: order book structure, ID types, persistence,
+  interface patterns, the iOS TCP client, and Postgres transactions
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — system boundaries and data flow
+- [`python-prototype/`](python-prototype/) — engine, book, economy, tests
+- [`ios-client/`](ios-client/) — SwiftUI client
+- [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md) — commands and workflow
+- [`docs/DOCKER.md`](docs/DOCKER.md) — local containerized setup
