@@ -34,3 +34,7 @@ DerivedData/
 *.moved-aside
 *.xcuserstate
 
+
+# Emacs autosave/lock files
+#*#
+.#*
