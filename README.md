@@ -33,7 +33,10 @@ to zero and every short gets paid.
 - **Economy** — accounts, positions, available vs. locked balances
 - **Settlement** — binary resolution against a reported threshold crossing
 - **Invariant auditing** — cash conservation, position and registry integrity
-- **iOS client** — SwiftUI, browses markets over raw TCP
+- **Simulation** — `simulation.py` drives market activity and settlement
+  end to end; `benchmark.py` profiles the engine under load
+- **iOS client** — SwiftUI, browses markets over raw TCP (newline-delimited
+  JSON)
 - **Infrastructure** — Docker Compose (`app` + `postgres`), CI running
   `ruff`, `mypy`, and unit + integration tests
 
@@ -66,7 +69,8 @@ Notes to game the burn rate, and you get delisted by hand.
   written up as they were made: order book structure, ID types, persistence,
   interface patterns, the iOS TCP client, and Postgres transactions
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — system boundaries and data flow
-- [`python-prototype/`](python-prototype/) — engine, book, economy, tests
+- [`python-prototype/`](python-prototype/) — engine, book, economy, tests,
+  and the simulation and benchmark scripts
 - [`ios-client/`](ios-client/) — SwiftUI client
 - [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md) — commands and workflow
 - [`docs/DOCKER.md`](docs/DOCKER.md) — local containerized setup
