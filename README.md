@@ -1,52 +1,76 @@
 # shortyourfriends
 
-`shortyourfriends` is a systems-focused prediction market prototype.
+**A prediction market for dopamine addiction.**
 
-Users trade binary contracts on screen-time outcomes, backed by a custom limit order book and matching engine.
+You short-sell your friends' bad habits. Capital is minted by walking and
+burned by doomscrolling — so you have to stay off your phone to afford to
+bet that your friends won't.
 
-## What you are looking at
-- A working Python exchange backend (TCP server + matching engine)
-- An iOS client prototype that talks to the backend over raw TCP
-- Automated CI for linting, type checks, unit tests, and integration tests
+## How it works
 
-This is not a SaaS app yet. It is an engineering prototype focused on trading-system architecture, correctness, and infrastructure hardening.
+**The economy.** Liquidity is capped by physical effort and drained by
+digital consumption.
 
-## Implemented today
-- Price-time matching engine with multi-market support
-- O(1)-style global order cancellation registry
-- Economy/accounting layer with locked vs available balances
-- Invariant auditing (positions, cash conservation, registry consistency)
-- End-to-end socket integration tests against a live server
-- GitHub Actions CI gates:
-  - `ruff`
-  - `mypy`
-  - `pytest` (unit/invariant)
-  - `pytest` (integration)
+- **Proof of Walk** — you earn `0.01` credits per verified step
+- **Doomscroll Burn** — you lose `5.00` credits per hour of screen time
+- **The constraint** — you must be active to afford to short anyone
 
-## In progress
-- Docker Compose local stack
-- PostgreSQL transactional persistence (replacing JSON snapshots)
+**The market.** Each contract is a binary bet on one person clearing one
+threshold, identified as `(user, minutes)` — `alice,480` is "Alice stays
+under 8 hours today."
 
-## Tech stack
-- Backend: Python 3.13+, `uv`, `pytest`, `mypy`, `ruff`
-- Client: SwiftUI + Network.framework
-- Protocol: newline-delimited JSON over TCP
+- **Long** — bet they stay under
+- **Short** — bet they fail
+- **Settlement** — contracts resolve to exactly 0 or 1. No partial credit.
 
-## Repository guide
-- `python-prototype/`: backend code, tests, simulation scripts
-- `ios-client/`: Swift client prototype
-- `ARCHITECTURE.md`: concise system design reference
-- `docs/DEVELOPER_GUIDE.md`: contributor command guide
-- `docs/DOCKER.md`: Docker Compose local stack guide
-- `CONTRIBUTING.md`: contribution workflow
+When the reported screen time crosses the threshold, the contract collapses
+to zero and every short gets paid.
 
-## Quick evaluation path
-If you want to evaluate this project quickly:
-1. Read `ARCHITECTURE.md` for system boundaries.
-2. Open `.github/workflows/ci.yml` for quality gates.
-3. Open `python-prototype/tests/` for behavioral coverage.
-4. Run backend checks via `docs/DEVELOPER_GUIDE.md`.
+## What runs today
 
-## Design constraints
-- Engine prices are integer cents (no floating-point money math).
-- Current persistence is JSON (`state.json`) and intentionally marked for migration to PostgreSQL transactions.
+- **Matching engine** — price-time priority, multi-market, integer cents
+- **Order book** — custom linked-list book with an O(1) cancellation registry
+- **Economy** — accounts, positions, available vs. locked balances
+- **Settlement** — binary resolution against a reported threshold crossing
+- **Invariant auditing** — cash conservation, position and registry integrity
+- **Simulation** — `simulation.py` drives market activity and settlement
+  end to end; `benchmark.py` profiles the engine under load
+- **iOS client** — SwiftUI, browses markets over raw TCP (newline-delimited
+  JSON)
+- **Infrastructure** — Docker Compose (`app` + `postgres`), CI running
+  `ruff`, `mypy`, and unit + integration tests
+
+## Not built yet
+
+The exchange works. Nothing connects it to a real phone yet.
+
+- **The oracle** — screen time currently arrives from `trigger_settle.py`,
+  a script with a hardcoded number. Nothing observes a real phone.
+- **Proof of Walk** — no `HealthKit` integration; steps are never read
+- **The Snitch** — no `DeviceActivityMonitor`; nothing wakes on a threshold
+- **Rust port** — the matching engine is Python, and staying that way for now
+- **Persistence** — state lives in `state.json`; the PostgreSQL migration
+  is the current focus
+
+## The privacy problem
+
+Apple's `DeviceActivity` API is deliberately privacy-preserving: it won't
+export raw usage data or app names, so nothing can simply read your screen
+time and report it.
+
+The intended workaround is **Proof of Portfolio** — you pick a "portfolio of
+shame" via `FamilyActivityPicker`, the app renders a sandboxed report of
+those icons, and you export it to the group. Stuff it with Calculator and
+Notes to game the burn rate, and you get delisted by hand.
+
+## Look around
+
+- [`python-prototype/logs/`](python-prototype/logs/) — six design decisions
+  written up as they were made: order book structure, ID types, persistence,
+  interface patterns, the iOS TCP client, and Postgres transactions
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — system boundaries and data flow
+- [`python-prototype/`](python-prototype/) — engine, book, economy, tests,
+  and the simulation and benchmark scripts
+- [`ios-client/`](ios-client/) — SwiftUI client
+- [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md) — commands and workflow
+- [`docs/DOCKER.md`](docs/DOCKER.md) — local containerized setup
